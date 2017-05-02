@@ -7,10 +7,13 @@ import sys
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: {} <rawfile>".format(sys.argv[0]))
+        print "Usage: {} <rawfile>".format(sys.argv[0])
         return
     path = sys.argv[1]
     img = utils.load_rawimage(path)
+    if img is None:
+        print "Invalid file."
+        return
     NoI = img.shape[0]
     NoD = NoA = NoI
     proj = numpy.empty((NoA, NoD))

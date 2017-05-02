@@ -8,7 +8,25 @@ cimport cython
 from libc.math cimport M_PI, sin, cos, floor
 
 class Projector:
+    """
+    instance variables:
+    x_offset
+    y_offset
+    center_x
+    center_y
+    detectors_offset
+    angular_range
+    detectors_length
 
+    image and projection data geometory:
+    img[y, x]
+    proj[theta, r]
+
+    method:
+    update_`instance variable`
+    forward
+    backward
+    """
     def __init__(self, length_of_image_side, num_of_detectors, num_of_angles):
         self.NoI = length_of_image_side  # number of pixels of image side
         self.NoD = num_of_detectors      # number of detectors

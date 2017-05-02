@@ -9,8 +9,7 @@ def load_rawimage(path):
     with open(path, "rb") as f:
         header = struct.unpack("ccxxII", f.read(12))
         if not (header[0] == b"P" and header[1] == b"0"):
-            print("Invalied file.")
-            sys.exit(1)
+            return None
         width = header[2]
         height = header[3]
         img = numpy.array(struct.unpack("{}f".format(width*height), f.read()))

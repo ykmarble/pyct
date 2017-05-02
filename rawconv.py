@@ -7,7 +7,7 @@ import sys
 
 def main():
     if (len(sys.argv) < 2):
-        print("Usage: {} image-file...".format(sys.argv[0]))
+        print "Usage: {} image-file...".format(sys.argv[0])
         return
     paths = sys.argv[1:]
     for p in paths:

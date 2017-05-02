@@ -8,8 +8,8 @@ import sys
 
 def main():
     if (len(sys.argv) != 4):
-        print("Usage: {} <image-file> <width> <height>".format(sys.argv[0]))
-        print("byte order: column -> row")
+        print "Usage: {} <image-file> <width> <height>".format(sys.argv[0])
+        print "byte order: column -> row"
         return
     _, path, width, height = sys.argv
     width = int(width)
