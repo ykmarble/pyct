@@ -13,20 +13,15 @@ def t_rdiff(img):
     out[1:] -= 0.5 * img
     return out
 
-def grad(img):
-    out_x = numpy.zeros_like(img)
-    out_y = numpy.zeros_like(img)
+def grad(img, out_x, out_y):
     out_x[:, :-1] = img[:, 1:] - img[:, :-1]
     out_y[:-1] = img[1:] - img[:-1]
-    return (out_x, out_y)
 
-def div_2(img_x, img_y):
-    out = numpy.zeros_like(img_x)
+def div_2(img_x, img_y, out):
     out[:, :-1] += img_x[:, :-1]
     out[:, 1:] -= img_x[:, :-1]
     out[:-1] += img_y[:-1]
     out[1:] -= img_y[:-1]
-    return out
 
 def tv_denoise(img, alpha, max_iter=200, mask=None):
     """
@@ -49,12 +44,14 @@ def tv_denoise(img, alpha, max_iter=200, mask=None):
     grad_x = numpy.empty_like(img)
     grad_y = numpy.empty_like(img)
     last_div_p = None
+    denom = numpy.empty_like(img)
     for i in xrange(max_iter):
-        div_p = div_2(p_x, p_y)
-        grad_x, grad_y = grad(div_p - img / alpha)
+        div_2(p_x, p_y, div_p)
+        grad(div_p - img / alpha, grad_x, grad_y)
         grad_x *= mask
         grad_y *= mask
-        denom = 1 + tau * numpy.sqrt(grad_x**2 + grad_y**2)
+        denom[:] = 1
+        denom += tau * numpy.sqrt(grad_x**2 + grad_y**2)
         p_x += tau * grad_x
         p_x /= denom
         p_y += tau * grad_y
@@ -66,9 +63,9 @@ def tv_denoise(img, alpha, max_iter=200, mask=None):
             break
         last_div_p = div_p
 
-    return img - div_p * alpha
+    img -= div_p * alpha
 
-def create_elipse_mask(shape, center, a, b):
+def create_elipse_mask(center, a, b, out):
     """
     Create a array which contains a elipse.
     Inside the elipse are filled by 1.
@@ -82,12 +79,12 @@ def create_elipse_mask(shape, center, a, b):
     a_2 = a**2.
     b_2 = b**2.
     ab_2 = a_2 * b_2
-    mask = numpy.zeros(shape)
-    for xi in xrange(mask.shape[1]):
-        for yi in xrange(mask.shape[0]):
+    out
+    for xi in xrange(out.shape[1]):
+        for yi in xrange(out.shape[0]):
             if a_2 * (y - yi)**2 + b_2 * (x - xi)**2 < ab_2:
-                mask[yi, xi] = 1
-    return mask
+                out[yi, xi] = 1
+    return out
 
 def vcoord(shape, point):
     """
@@ -142,7 +139,7 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         tv_denoise(recon, tau)
         A.forward(recon, proj)
         # insert phase differential
-        mu = mu + sigma * (proj - data)
+        mu += sigma * (proj - data)
         iter_callback(i, recon, proj)
 
     return recon
@@ -170,9 +167,8 @@ def main():
     A.forward(img, proj)
     def callback(i, x, y):
         print i
-    recon = app_recon(A, proj, 0.005, 0.005, 1000, iter_callback=callback)
+    recon = app_recon(A, proj, 0.005, 0.005, 100, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
-    utils.show_image(recon)
 
 if __name__ == '__main__':
     main()
