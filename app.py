@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 
 import projector
+import fbp
+import utils
 import numpy
 
 def rdiff(img):
@@ -131,7 +133,9 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     for i in xrange(niter):
         A.forward(recon, proj)
         # insert phase differential
-        mu_bar = mu + sigma * (proj - data)
+        proj -= data
+        fbp.ramp_filter(proj)
+        mu_bar = mu + sigma * proj
         # insert inverse phase differential
         A.backward(mu_bar, img)
         recon -= tau * img
@@ -139,7 +143,9 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         tv_denoise(recon, tau)
         A.forward(recon, proj)
         # insert phase differential
-        mu += sigma * (proj - data)
+        proj -= data
+        fbp.ramp_filter(proj)
+        mu += sigma * proj
         iter_callback(i, recon, proj)
 
     return recon
@@ -148,8 +154,6 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
 def main():
     import sys
     import os.path
-    import projector
-    import utils
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
         sys.exit(1)
@@ -161,12 +165,20 @@ def main():
     if img is None:
         print "invalid file"
         sys.exit(1)
+    scale = 0.5
     angle_px = detector_px = width_px = img.shape[1]
+    detector_px = int(detector_px * scale)
     A = projector.Projector(width_px, detector_px, angle_px)
+    A.update_detectors_length(detector_px)
     proj = numpy.empty((angle_px, detector_px))
     A.forward(img, proj)
+    proj == proj  # something wrong
+    print img[100,100]
     def callback(i, x, y):
         print i
+        if (i % 10 == 9):
+            utils.show_image(x)
+            print x[100,100]
     recon = app_recon(A, proj, 0.005, 0.005, 100, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
 
