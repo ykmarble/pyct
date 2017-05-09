@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 
 import projector
+import fbp
+import utils
 import numpy
 
 def rdiff(img):
@@ -121,26 +123,40 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     @mu: initial mu, `None` means using zero
     """
     if recon is None:
-        recon = numpy.empty((A.NoI, A.NoI), dtype=numpy.float)
+        recon = numpy.zeros((A.NoI, A.NoI))
     if mu is None:
-        mu = numpy.empty((A.NoA, A.NoD), dtype=numpy.float)
+        mu = numpy.zeros((A.NoA, A.NoD))
 
+    recon_proj = numpy.zeros_like(mu)
     img = numpy.empty_like(recon)
     proj = numpy.empty_like(mu)
+
+    interior_w = data.shape[1]
+    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
 
     for i in xrange(niter):
         A.forward(recon, proj)
         # insert phase differential
-        mu_bar = mu + sigma * (proj - data)
+        proj -= recon_proj
+        fbp.ramp_filter(proj)
+        utils.show_image(proj)
+        mu_bar = mu + sigma * proj
         # insert inverse phase differential
         A.backward(mu_bar, img)
         recon -= tau * img
         # insert support constraint
         tv_denoise(recon, tau)
+
+        recon_proj -= tau * mu_bar
+        #recon_proj[:] = 0
+        recon_proj[:, interior_pad:interior_pad + interior_w] = data
+
         A.forward(recon, proj)
         # insert phase differential
-        mu += sigma * (proj - data)
-        iter_callback(i, recon, proj)
+        proj -= recon_proj
+        fbp.ramp_filter(proj)
+        mu += sigma * proj
+        iter_callback(i, recon, recon_proj)
 
     return recon
 
@@ -148,8 +164,6 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
 def main():
     import sys
     import os.path
-    import projector
-    import utils
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
         sys.exit(1)
@@ -161,12 +175,21 @@ def main():
     if img is None:
         print "invalid file"
         sys.exit(1)
+
+    scale = 0.6
     angle_px = detector_px = width_px = img.shape[1]
     A = projector.Projector(width_px, detector_px, angle_px)
-    proj = numpy.empty((angle_px, detector_px))
-    A.forward(img, proj)
+    miniA = projector.Projector(width_px, int(detector_px * scale), angle_px)
+    miniA.update_detectors_length(detector_px * scale)
+    proj = numpy.empty((angle_px, int(detector_px * scale)))
+    miniA.forward(img, proj)
+    print img[100,100]
     def callback(i, x, y):
         print i
+        if (i % 10 == 9):
+            print x[100,100]
+            utils.show_image(x)
+
     recon = app_recon(A, proj, 0.005, 0.005, 100, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
 
