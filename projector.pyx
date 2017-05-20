@@ -5,7 +5,8 @@ cimport numpy
 DTYPE = numpy.float
 ctypedef numpy.float_t DTYPE_t
 cimport cython
-from libc.math cimport M_PI, sin, cos, floor
+from cython.parallel import *
+from libc.math cimport M_PI, sin, cos, floor, fabs
 
 class Projector:
     """
@@ -113,17 +114,17 @@ class Projector:
         dr = self.dr
         dtheta = self.dtheta
 
-        for ti in xrange(0, NoA):
+        for ti in prange(NoA, nogil=True):
             th = ti * dtheta
             sin_th = sin(th)
             cos_th = cos(th)
-            abs_sin = abs(sin_th)
-            abs_cos = abs(cos_th)
+            abs_sin = fabs(sin_th)
+            abs_cos = fabs(cos_th)
 
             if (abs_sin < abs_cos):
                 sin_cos = sin_th / cos_th
                 inv_cos_th = 1 / cos_th
-                inv_abs_cos = abs(inv_cos_th)
+                inv_abs_cos = fabs(inv_cos_th)
 
                 for ri in xrange(NoD):
                     r = (ri - detectors_center) * dr
@@ -149,7 +150,7 @@ class Projector:
             else:
                 cos_sin = cos_th / sin_th
                 inv_sin_th = 1 / sin_th
-                inv_abs_sin = abs(inv_sin_th)
+                inv_abs_sin = fabs(inv_sin_th)
 
                 for ri in xrange(NoD):
                     r = (ri - detectors_center) * dr
@@ -173,7 +174,7 @@ class Projector:
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
                                 dst[ti, ri] = dst[ti, ri] + aijp * src[yi, xi+1] * inv_abs_sin
 
-cdef inline int is_valid_index(int xi, int yi, double center_x, double center_y, int NoI):
+cdef inline int is_valid_index(int xi, int yi, double center_x, double center_y, int NoI) nogil:
     cdef double x = xi - center_x
     cdef double y = center_y - yi
     return 0 <= xi and xi < NoI \

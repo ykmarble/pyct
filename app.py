@@ -123,12 +123,16 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     @mu: initial mu, `None` means using zero
     """
     if recon is None:
-        recon = numpy.empty((A.NoI, A.NoI), dtype=numpy.float)
+        recon = numpy.zeros((A.NoI, A.NoI))
     if mu is None:
-        mu = numpy.empty((A.NoA, A.NoD), dtype=numpy.float)
+        mu = numpy.zeros((A.NoA, A.NoD))
 
+    recon_proj = numpy.zeros_like(mu)
     img = numpy.empty_like(recon)
     proj = numpy.empty_like(mu)
+
+    interior_w = data.shape[1]
+    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
 
     for i in xrange(niter):
         A.forward(recon, proj)
@@ -141,6 +145,11 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         recon -= tau * img
         # insert support constraint
         tv_denoise(recon, tau)
+
+        recon_proj -= tau * mu_bar
+        #recon_proj[:] = 0
+        recon_proj[:, interior_pad:interior_pad + interior_w] = data
+
         A.forward(recon, proj)
         # insert phase differential
         proj -= data
