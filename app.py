@@ -4,6 +4,7 @@ import projector
 import fbp
 import utils
 import numpy
+from math import ceil, floor
 
 def rdiff(img):
     return 0.5 * (img[:-1] - img[1:])
@@ -109,6 +110,57 @@ def acoord(shape, point):
     x, y = point
     return (x + w/2., h/2. - y)
 
+def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
+              iter_callback=lambda *arg: 0):
+    """
+    Perform interior CT image reconstruction with APP method.
+    @A : system matrix class
+    @data : projection data
+    @sigma : parameter
+    @tau : parameter
+    @niter : iteration times
+    @iter_callback : callback function called each iterations
+    @recon: initial image, `None` means using zero image
+    @mu: initial mu, `None` means using zero
+    """
+    if recon is None:
+        recon = numpy.zeros((A.NoI, A.NoI))
+    if mu is None:
+        mu = numpy.zeros((A.NoA, A.NoD))
+
+    recon_proj = numpy.empty_like(mu)
+    img = numpy.empty_like(recon)
+    proj = numpy.empty_like(mu)
+
+    interior_w = data.shape[1]
+    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
+    recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
+    recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
+
+    for i in xrange(niter):
+        A.forward(recon, proj)
+        # insert phase differential
+        proj -= recon_proj
+        fbp.ramp_filter(proj)
+        mu_bar = mu + sigma * proj
+        # insert inverse phase differential
+        A.backward(mu_bar, img)
+        recon -= tau * img
+        # insert support constraint
+        tv_denoise(recon, tau)
+
+        recon_proj -= tau * mu_bar
+        recon_proj[:, interior_pad:interior_pad + interior_w] = data
+
+        A.forward(recon, proj)
+        iter_callback(i, recon, recon_proj, mu)
+        # insert phase differential
+        proj -= recon_proj
+        fbp.ramp_filter(proj)
+        mu += sigma * proj
+
+    return recon
+
 def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
               iter_callback=lambda *arg: 0):
     """
@@ -127,19 +179,14 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     if mu is None:
         mu = numpy.zeros((A.NoA, A.NoD))
 
-    recon_proj = numpy.zeros_like(mu)
     img = numpy.empty_like(recon)
     proj = numpy.empty_like(mu)
-
-    interior_w = data.shape[1]
-    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
 
     for i in xrange(niter):
         A.forward(recon, proj)
         # insert phase differential
-        proj -= recon_proj
+        proj -= data
         fbp.ramp_filter(proj)
-        utils.show_image(proj)
         mu_bar = mu + sigma * proj
         # insert inverse phase differential
         A.backward(mu_bar, img)
@@ -147,16 +194,12 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         # insert support constraint
         tv_denoise(recon, tau)
 
-        recon_proj -= tau * mu_bar
-        #recon_proj[:] = 0
-        recon_proj[:, interior_pad:interior_pad + interior_w] = data
-
         A.forward(recon, proj)
+        iter_callback(i, recon, proj)
         # insert phase differential
-        proj -= recon_proj
+        proj -= data
         fbp.ramp_filter(proj)
         mu += sigma * proj
-        iter_callback(i, recon, recon_proj)
 
     return recon
 
@@ -178,19 +221,23 @@ def main():
 
     scale = 0.6
     angle_px = detector_px = width_px = img.shape[1]
+    interiorA = projector.Projector(width_px, int(ceil(detector_px*scale)), angle_px)
+    interiorA.update_detectors_length(ceil(detector_px * scale))
+    proj = numpy.empty((angle_px, int(ceil(detector_px * scale))))
+    interiorA.forward(img, proj)
     A = projector.Projector(width_px, detector_px, angle_px)
-    miniA = projector.Projector(width_px, int(detector_px * scale), angle_px)
-    miniA.update_detectors_length(detector_px * scale)
-    proj = numpy.empty((angle_px, int(detector_px * scale)))
-    miniA.forward(img, proj)
-    print img[100,100]
-    def callback(i, x, y):
+    def callback(i, *argv):
         print i
+        x = argv[0]
+        print x[x.shape[0]/2, x.shape[1]/2]
         if (i % 10 == 9):
-            print x[100,100]
-            utils.show_image(x)
+            for j in xrange(len(argv)):
+                utils.show_image(argv[j])
 
-    recon = app_recon(A, proj, 0.005, 0.005, 100, iter_callback=callback)
+    print img[img.shape[0]/2, img.shape[1]/2]
+
+    recon = app_recon(interiorA, proj, 0.01, 0.05, 1000, iter_callback=callback)
+    #recon = fullapp_recon(A, proj, 0.01, 0.05, 1000, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
 
 if __name__ == '__main__':
