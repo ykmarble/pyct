@@ -5,6 +5,7 @@ import struct
 import numpy
 import pylab
 import cv2
+import sys
 
 def load_rawimage(path):
     with open(path, "rb") as f:
@@ -36,4 +37,6 @@ def show_image(img, clim=None):
     normalized -= clim[0]
     normalized /= clim[1] - clim[0]
     cv2.imshow("ctpy", normalized)
-    cv2.waitKey(0)
+    key = cv2.waitKey(0)
+    if key == ord("q"):
+        sys.exit()
