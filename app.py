@@ -136,6 +136,9 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
     recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
     recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
+    recon_proj[:, interior_pad:interior_pad + interior_w] = data
+    recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
+    recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
 
     for i in xrange(niter):
         A.forward(recon, proj)
@@ -147,6 +150,7 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         A.backward(mu_bar, img)
         recon -= tau * img
         # insert support constraint
+        recon[recon < 0] = 0
         tv_denoise(recon, tau)
 
         recon_proj -= tau * mu_bar
@@ -229,15 +233,15 @@ def main():
     def callback(i, *argv):
         print i
         x = argv[0]
-        print x[x.shape[0]/2, x.shape[1]/2]
+        print x[x.shape[0]/2, x.shape[1]/2], numpy.min(x), numpy.max(x)
         if (i % 10 == 9):
             for j in xrange(len(argv)):
                 utils.show_image(argv[j])
 
     print img[img.shape[0]/2, img.shape[1]/2]
 
-    recon = app_recon(interiorA, proj, 0.01, 0.05, 1000, iter_callback=callback)
-    #recon = fullapp_recon(A, proj, 0.01, 0.05, 1000, iter_callback=callback)
+    #recon = app_recon(interiorA, proj, 0.01, 0.05, 1000, iter_callback=callback)
+    recon = fullapp_recon(A, proj, 0.01, 0.05, 1000, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
 
 if __name__ == '__main__':
