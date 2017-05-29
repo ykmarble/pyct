@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
 import sys
+import os
 import struct
 import numpy
 import pylab
@@ -26,10 +27,11 @@ def save_rawimage(img, outpath):
         f.write(header)
         f.write(payload)
 
-def show_image(img, clim=None):
+def show_image(img, clim=None, output_path="saved_img.dat"):
     """
     @img: 2d or 3d numpy array
     @clim: tuple contains pair of color bound, or None which means deriving them from array
+    @output_path: location image will be stored
     """
     if clim is None:
         clim = (numpy.min(img), numpy.max(img))
@@ -40,3 +42,6 @@ def show_image(img, clim=None):
     key = cv2.waitKey(0)
     if key == ord("q"):
         sys.exit()
+    elif key == ord("s"):
+        save_rawimage(img, "saved_img.dat")
+        print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
