@@ -144,13 +144,13 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         A.forward(recon, proj)
         # insert phase differential
         proj -= recon_proj
-        fbp.ramp_filter(proj)
+        #fbp.ramp_filter(proj)
+        fbp.shepp_logan_filter(proj)
         mu_bar = mu + sigma * proj
         # insert inverse phase differential
         A.backward(mu_bar, img)
         recon -= tau * img
         # insert support constraint
-        recon[recon < 0] = 0
         tv_denoise(recon, tau)
 
         recon_proj -= tau * mu_bar
@@ -160,7 +160,8 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         iter_callback(i, recon, recon_proj, mu)
         # insert phase differential
         proj -= recon_proj
-        fbp.ramp_filter(proj)
+        #fbp.ramp_filter(proj)
+        fbp.shepp_logan_filter(proj)
         mu += sigma * proj
 
     return recon
@@ -190,7 +191,8 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         A.forward(recon, proj)
         # insert phase differential
         proj -= data
-        fbp.ramp_filter(proj)
+        #fbp.ramp_filter(proj)
+        fbp.shepp_logan_filter(proj)
         mu_bar = mu + sigma * proj
         # insert inverse phase differential
         A.backward(mu_bar, img)
@@ -202,7 +204,8 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         iter_callback(i, recon, proj)
         # insert phase differential
         proj -= data
-        fbp.ramp_filter(proj)
+        #fbp.ramp_filter(proj)
+        fbp.shepp_logan_filter(proj)
         mu += sigma * proj
 
     return recon
@@ -240,8 +243,8 @@ def main():
 
     print img[img.shape[0]/2, img.shape[1]/2]
 
-    #recon = app_recon(interiorA, proj, 0.01, 0.05, 1000, iter_callback=callback)
-    recon = fullapp_recon(A, proj, 0.01, 0.05, 1000, iter_callback=callback)
+    #recon = app_recon(interiorA, proj, 0.02, 0.02, 1000, iter_callback=callback)
+    recon = fullapp_recon(A, proj, 0.02, 0.02, 1000, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
 
 if __name__ == '__main__':
