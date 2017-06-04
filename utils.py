@@ -45,3 +45,9 @@ def show_image(img, clim=None, output_path="saved_img.dat"):
     elif key == ord("s"):
         save_rawimage(img, "saved_img.dat")
         print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
+
+def empty_img(A):
+    return numpy.empty((A.NoI, A.NoI))
+
+def empty_proj(A):
+    return numpy.empty((A.NoA, A.NoD))
