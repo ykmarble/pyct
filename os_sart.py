@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
 from utils import *
 from projector import Projector
+from math import ceil, floor
 import numpy
 
 def make_subset(NoA, n_subset):
@@ -18,16 +20,20 @@ def make_subset(NoA, n_subset):
         t += unit_len
     return index2d
 
-def os_sart(A, data, n_subset, n_iter):
-    recon = empty_img(A)
-    recon[:, :] = 0
+def os_sart(A, data, n_subset, n_iter, recon=None, subsets=None, offset_i=0):
+    if recon is None:
+        recon = empty_img(A)
+        recon[:, :] = 0
     img = empty_img(A)
     proj = empty_proj(A)
 
     NoA, NoD = proj.shape
     unit_len = NoA / n_subset
     step = NoA / unit_len
-    subsets = make_subset(NoA, n_subset)
+    if subsets is None:
+        subsets = make_subset(NoA, n_subset)
+    else:
+        assert len(subsets) == n_subset
 
     # calc a_i+
     a_ip = empty_proj(A)
@@ -41,9 +47,8 @@ def os_sart(A, data, n_subset, n_iter):
         A.partial_backward(proj, a_pj_subset[i], subsets[i], None)
         a_pj_subset[i][a_pj_subset[i]==0] = 1
 
-    for i in xrange(n_iter):
-        alpha = 200. / (199 + i)
-        print i, alpha
+    for i in xrange(offset_i, n_iter + offset_i):
+        alpha = 2000. / (1999 + i)
         i_subset = i % n_subset
         cur_subset = subsets[i_subset]
         A.partial_forward(recon, proj, cur_subset, None)
@@ -52,21 +57,49 @@ def os_sart(A, data, n_subset, n_iter):
         A.partial_backward(proj, img, cur_subset, None)
         img /= a_pj_subset[i_subset]
         recon += alpha * img
-        show_image(recon)
     return recon
 
-def os_sart_tv(A, data, alpha, alpha_tv, n):
+def tv_minimize(img, derivative):
+    epsilon = 1e-3
+    mu = numpy.full_like(img, epsilon**2)
+    # [1:-2, 1:-2] (m, n)
+    # [2:-1, 1:-2] (m+1, n)
+    # [1:-2, 2:-1] (m, n+1)
+    # [0:-3, 1:-2] (m-1, n)
+    # [1:-2, 0:-3] (m, n-1)  あんまり見てると目が腐る
+    mu[1:-2, 1:-2] += (img[2:-1, 1:-2] - img[1:-2, 1:-2])**2    \
+                      + (img[1:-2, 2:-1] - img[1:-2, 1:-2])**2  \
+                      + (img[1:-2, 1:-2] - img[0:-3, 1:-2])**2  \
+                      + (img[1:-2, 1:-2] - img[1:-2, 0:-3])**2
+    numpy.sqrt(mu, mu)
+    derivative[:, :] = 0
+    derivative[1:-2, 1:-2] = \
+      (4 * img[1:-2, 1:-2] - img[2:-1, 1:-2] - img[1:-2, 2:-1] - img[0:-3, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 1:-2] \
+      + (img[1:-2, 1:-2] - img[2:-1, 1:-2]) / mu[2:-1, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 2:-1]) / mu[1:-2, 2:-1] \
+      + (img[1:-2, 1:-2] - img[0:-3, 1:-2]) / mu[0:-3, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 0:-3]
+
+def os_sart_tv(A, data, alpha, n_iter, recon=None):
+    if recon == None:
+        recon = empty_img(A)
+        recon[:, :] = 0
     alpha_s = 0.997
-    alpha_tv_s = alpha_tv
-    epsilon = 1e-4
+    n_subset = 20
+    n_tv = 5
     img = empty_img(A)
     proj = empty_proj(A)
-    proj_next = empty_proj(A)
-    mask = empty_proj(A)
-    scale_proj = empty_proj(A)
-    scale_img = empty_img(A)
-    mu = empty_img(A)
+    NoA, NoD = proj.shape
     d = empty_img(A)
+    subsets = make_subset(NoA, n_subset)
+    for i in xrange(n_iter):
+        print i
+        for p_art in xrange(n_subset):
+            os_sart(A, data, 20, 1, recon=recon, subsets=subsets, offset_i=p_art+n_subset*i)
+            for p_tv in xrange(n_tv):
+                tv_minimize(recon, d)
+                beta = numpy.max(recon)/numpy.max(d)
+                recon -= alpha * beta * d
+                alpha *= alpha_s
+        show_image(recon)
 
 def main():
     import sys
@@ -83,11 +116,13 @@ def main():
         print "invalid file"
         sys.exit(1)
 
+    scale = 0.6
     angle_px = detector_px = width_px = img.shape[1]
-    A = Projector(width_px, angle_px, detector_px)
-    proj = empty_proj(A)
-    A.forward(img, proj)
-    os_sart(A, proj, 10, 10000)
+    interiorA = Projector(width_px, angle_px, int(ceil(detector_px*scale)))
+    interiorA.update_detectors_length(ceil(detector_px * scale))
+    proj = empty_proj(interiorA)
+    interiorA.forward(img, proj)
+    os_sart_tv(interiorA, proj, 0.005, 1000)
 
 if __name__ == '__main__':
     main()
