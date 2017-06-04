@@ -109,7 +109,7 @@ class Projector:
             assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
         self.projection(img, proj, False, th_indexes, r_indexes)
 
-    def partial_backward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
+    def partial_backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
                         numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
         assert self.is_valid_dimension(img, proj)
@@ -117,7 +117,7 @@ class Projector:
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
         if r_indexes is not None:
             assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self.projection(img, proj, True, th_indexes, r_indexes)
+        self.projection(proj, img, True, th_indexes, r_indexes)
 
     @cython.boundscheck(False)
     def projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
