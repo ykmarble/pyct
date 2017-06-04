@@ -53,6 +53,10 @@ class Projector:
         # center_y          : derived from image_origin and y_offset
         # detectors_center  : derived from detectors_origin and detectors_offset
 
+        # cache
+        self.all_th_indexes = numpy.arange(self.NoA)
+        self.all_r_indexes = numpy.arange(self.NoD)
+
     def update_x_offset(self, offset):
         self.x_offset = offset
         self.center_x = self.x_offset + self.image_origin
@@ -81,40 +85,68 @@ class Projector:
         self.center_y = y
         self.y_offset = -self.center_y + self.image_origin
 
-    def is_valid_dimension(self, img, proj):
+    def is_valid_dimension(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj):
         return img.shape[0] == img.shape[1] \
           and img.shape[0] == self.NoI \
           and proj.shape[0] == self.NoA \
           and proj.shape[1] == self.NoD
 
-    def forward(self, img, proj):
+    def forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj):
         assert self.is_valid_dimension(img, proj)
         self.projection(img, proj, False)
 
-    def backward(self, proj, img):
+    def backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img):
         assert self.is_valid_dimension(img, proj)
         self.projection(proj, img, True)
 
+    def partial_forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
+                        numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
+                        numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
+        assert self.is_valid_dimension(img, proj)
+        if th_indexes is not None:
+            assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
+        if r_indexes is not None:
+            assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
+        self.projection(img, proj, False, th_indexes, r_indexes)
+
+    def partial_backward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
+                        numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
+                        numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
+        assert self.is_valid_dimension(img, proj)
+        if th_indexes is not None:
+            assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
+        if r_indexes is not None:
+            assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
+        self.projection(img, proj, True, th_indexes, r_indexes)
+
     @cython.boundscheck(False)
-    def projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False):
-        cdef int ti, ri, xi, yi
+    def projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
+                   numpy.ndarray[numpy.int_t, ndim=1] th_indexes=None,
+                   numpy.ndarray[numpy.int_t, ndim=1] r_indexes=None):
+        cdef int ti, ri, xi, yi, ti_i, ri_i
         cdef DTYPE_t th, sin_th, cos_th, abs_sin, abs_cos, sin_cos, cos_sin,
         cdef DTYPE_t inv_cos_th, inv_abs_cos, inv_sin_th, inv_abs_sin
         cdef DTYPE_t r, ray_offset, xs, ys, rayx, rayy, aij, aijp
         cdef int NoI, NoA, NoD
         cdef DTYPE_t center_x, center_y, detectors_center, dr, dtheta
 
+        if th_indexes is None:
+            th_indexes = self.all_th_indexes
+        if r_indexes is None:
+            r_indexes = self.all_r_indexes
+
         dst[:, :] = 0
         NoI = self.NoI
-        NoA = self.NoA
-        NoD = self.NoD
+        NoA = th_indexes.shape[0]
+        NoD = r_indexes.shape[0]
         center_x = self.center_x
         center_y = self.center_y
         detectors_center = self.detectors_center
         dr = self.dr
         dtheta = self.dtheta
 
-        for ti in prange(NoA, nogil=True):
+        for ti_i in prange(NoA, nogil=True):
+            ti = th_indexes[ti_i]
             th = ti * dtheta
             sin_th = sin(th)
             cos_th = cos(th)
@@ -126,7 +158,8 @@ class Projector:
                 inv_cos_th = 1 / cos_th
                 inv_abs_cos = fabs(inv_cos_th)
 
-                for ri in xrange(NoD):
+                for ri_i in xrange(NoD):
+                    ri = r_indexes[ri_i]
                     r = (ri - detectors_center) * dr
                     ray_offset = r * inv_cos_th
 
@@ -152,7 +185,8 @@ class Projector:
                 inv_sin_th = 1 / sin_th
                 inv_abs_sin = fabs(inv_sin_th)
 
-                for ri in xrange(NoD):
+                for ri_i in xrange(NoD):
+                    ri = r_indexes[ri_i]
                     r = (ri - detectors_center) * dr
                     ray_offset = r * inv_sin_th
 

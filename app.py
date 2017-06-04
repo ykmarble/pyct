@@ -237,9 +237,8 @@ def main():
         print i
         x = argv[0]
         print x[x.shape[0]/2, x.shape[1]/2], numpy.min(x), numpy.max(x)
-        if (i % 10 == 9):
-            for j in xrange(len(argv)):
-                utils.show_image(argv[j])
+        for j in xrange(len(argv)):
+            utils.show_image(argv[j])
 
     print img[img.shape[0]/2, img.shape[1]/2]
 
