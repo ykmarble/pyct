@@ -28,7 +28,7 @@ class Projector:
     forward
     backward
     """
-    def __init__(self, length_of_image_side, num_of_detectors, num_of_angles):
+    def __init__(self, length_of_image_side, num_of_angles, num_of_detectors):
         self.NoI = length_of_image_side  # number of pixels of image side
         self.NoD = num_of_detectors      # number of detectors
         self.NoA = num_of_angles         # number of projection angles

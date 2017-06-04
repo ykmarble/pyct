@@ -17,7 +17,7 @@ def main():
     NoI = img.shape[0]
     NoD = NoA = NoI
     proj = numpy.empty((NoA, NoD))
-    A = projector.Projector(NoI, NoD, NoA)
+    A = projector.Projector(NoI, NoA, NoD)
     A.forward(img, proj)
     utils.show_image(proj)
     utils.save_rawimage(proj, "proj.dat")

@@ -228,11 +228,11 @@ def main():
 
     scale = 0.6
     angle_px = detector_px = width_px = img.shape[1]
-    interiorA = projector.Projector(width_px, int(ceil(detector_px*scale)), angle_px)
+    interiorA = projector.Projector(width_px, angle_px, int(ceil(detector_px*scale)))
     interiorA.update_detectors_length(ceil(detector_px * scale))
     proj = numpy.empty((angle_px, int(ceil(detector_px * scale))))
     interiorA.forward(img, proj)
-    A = projector.Projector(width_px, detector_px, angle_px)
+    A = projector.Projector(width_px, angle_px, detector_px)
     def callback(i, *argv):
         print i
         x = argv[0]
