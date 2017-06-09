@@ -47,7 +47,7 @@ def show_image(img, clim=None, output_path="saved_img.dat"):
         print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
 
 def empty_img(A):
-    return numpy.empty((A.NoI, A.NoI))
+    return numpy.empty(A.get_image_shape())
 
 def empty_proj(A):
-    return numpy.empty((A.NoA, A.NoD))
+    return numpy.empty(A.get_projector_shape())

@@ -8,7 +8,7 @@ cimport cython
 from cython.parallel import *
 from libc.math cimport M_PI, sin, cos, floor, fabs
 
-class Projector:
+class Projector(object):
     """
     instance variables:
     x_offset
@@ -56,6 +56,12 @@ class Projector:
         # cache
         self.all_th_indexes = numpy.arange(self.NoA)
         self.all_r_indexes = numpy.arange(self.NoD)
+
+    def get_image_shape(self):
+        return (self.NoI, self.NoI)
+
+    def get_projector_shape(self):
+        return (self.NoA, self.NoD)
 
     def update_x_offset(self, offset):
         self.x_offset = offset
