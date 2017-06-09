@@ -51,3 +51,9 @@ def empty_img(A):
 
 def empty_proj(A):
     return numpy.empty(A.get_projector_shape())
+
+def zero_img(A):
+    return numpy.zeros(A.get_image_shape())
+
+def zero_proj(A):
+    return numpy.zeros(A.get_projector_shape())

@@ -1,20 +1,11 @@
 #!/usr/bin/env python2
 
-import projector
+#from projector import Projector
+from differencial import Projector
 import fbp
 import utils
 import numpy
 from math import ceil, floor
-
-def rdiff(img):
-    return 0.5 * (img[:-1] - img[1:])
-
-def t_rdiff(img):
-    h, w = img.shape
-    out = img.zeros((h+1, w))
-    out[:-1] += 0.5 * img
-    out[1:] -= 0.5 * img
-    return out
 
 def grad(img, out_x, out_y):
     out_x[:, :-1] = img[:, 1:] - img[:, :-1]
@@ -124,28 +115,30 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     @mu: initial mu, `None` means using zero
     """
     if recon is None:
-        recon = numpy.zeros((A.NoI, A.NoI))
+        recon = utils.zero_img(A)
     if mu is None:
-        mu = numpy.zeros((A.NoA, A.NoD))
+        mu = utils.zero_proj(A)
 
-    recon_proj = numpy.empty_like(mu)
-    img = numpy.empty_like(recon)
-    proj = numpy.empty_like(mu)
+    recon_proj = utils.empty_proj(A)
+    img = utils.empty_img(A)
+    proj = utils.empty_proj(A)
 
     interior_w = data.shape[1]
     interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
-    recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
-    recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
-    recon_proj[:, interior_pad:interior_pad + interior_w] = data
-    recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
-    recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
+    #recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
+    #recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
+    #recon_proj[:, interior_pad:interior_pad + interior_w] = data
+    #recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
+    #recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
 
     for i in xrange(niter):
         A.forward(recon, proj)
         # insert phase differential
         proj -= recon_proj
+        #fbp.cut_filter(proj)
         #fbp.ramp_filter(proj)
-        fbp.shepp_logan_filter(proj)
+        #fbp.shepp_logan_filter(proj)
+        fbp.inv_ramp_filter(proj)
         mu_bar = mu + sigma * proj
         # insert inverse phase differential
         A.backward(mu_bar, img)
@@ -160,8 +153,10 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None,
         iter_callback(i, recon, recon_proj, mu)
         # insert phase differential
         proj -= recon_proj
+        #fbp.cut_filter(proj)
         #fbp.ramp_filter(proj)
-        fbp.shepp_logan_filter(proj)
+        #fbp.shepp_logan_filter(proj)
+        fbp.inv_ramp_filter(proj)
         mu += sigma * proj
 
     return recon
@@ -180,12 +175,12 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None,
     @mu: initial mu, `None` means using zero
     """
     if recon is None:
-        recon = numpy.zeros((A.NoI, A.NoI))
+        recon = utils.zero_img(A)
     if mu is None:
-        mu = numpy.zeros((A.NoA, A.NoD))
+        mu = utils.zero_proj(A)
 
-    img = numpy.empty_like(recon)
-    proj = numpy.empty_like(mu)
+    img = utils.empty_img(A)
+    proj = utils.empty_proj(A)
 
     for i in xrange(niter):
         A.forward(recon, proj)
@@ -228,22 +223,23 @@ def main():
 
     scale = 0.6
     angle_px = detector_px = width_px = img.shape[1]
-    interiorA = projector.Projector(width_px, angle_px, int(ceil(detector_px*scale)))
+    interiorA = Projector(width_px, angle_px, int(ceil(detector_px*scale)))
     interiorA.update_detectors_length(ceil(detector_px * scale))
     proj = numpy.empty((angle_px, int(ceil(detector_px * scale))))
     interiorA.forward(img, proj)
-    A = projector.Projector(width_px, angle_px, detector_px)
+    A = Projector(width_px, angle_px, detector_px)
     def callback(i, *argv):
         print i
         x = argv[0]
         print x[x.shape[0]/2, x.shape[1]/2], numpy.min(x), numpy.max(x)
-        for j in xrange(len(argv)):
-            utils.show_image(argv[j])
+        utils.show_image(x)
+        #for j in xrange(len(argv)):
+        #    utils.show_image(argv[j])
 
     print img[img.shape[0]/2, img.shape[1]/2]
 
     #recon = app_recon(interiorA, proj, 0.02, 0.02, 1000, iter_callback=callback)
-    recon = fullapp_recon(A, proj, 0.02, 0.02, 1000, iter_callback=callback)
+    recon = fullapp_recon(A, proj, 0.001, 0.001, 1000, iter_callback=callback)
     utils.save_rawimage(recon, "recon.dat")
 
 if __name__ == '__main__':
