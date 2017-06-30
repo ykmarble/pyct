@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
 import projector
+import math
 import numpy
 
 class Projector(projector.Projector):
@@ -8,14 +9,14 @@ class Projector(projector.Projector):
         """
         Notice: `num_of_detectors` means a shape of *differential* projection data.
         """
-        super(self.__class__, self).__init__(length_of_image_side, num_of_angles, num_of_detectors+1)
-        self.last_proj = numpy.empty((num_of_angles, num_of_detectors+1))
+        super(self.__class__, self).__init__(length_of_image_side, num_of_angles, num_of_detectors)
+        self.last_proj = numpy.empty((num_of_angles, num_of_detectors))
 
     def get_image_shape(self):
         return (self.NoI, self.NoI)
 
     def get_projector_shape(self):
-        return (self.NoA, self.NoD-1)
+        return (self.NoA, self.NoD)
 
     def forward(self, img, proj):
         super(self.__class__, self).forward(img, self.last_proj)
@@ -38,12 +39,24 @@ class Projector(projector.Projector):
         super(self.__class__, self).partial_backward(self.last_proj, img, th_indexes, r_indexes)
 
     def rdiff(self, proj, diff_proj):
-        diff_proj[:] = 0.5 * (proj[:, :-1] - proj[:, 1:])
+        diff_proj[:, :-1] = proj[:, 1:] - proj[:, :-1]
+        diff_proj[:, -1] = 0
 
     def t_rdiff(self, diff_proj, proj):
-        proj[:] = 0
-        proj[:, :-1] += 0.5 * diff_proj
-        proj[:, 1:] -= 0.5 * diff_proj
+        proj[:, 0] = -diff_proj[:, 0]
+        proj[:, 1:] = diff_proj[:, :-1] - diff_proj[:, 1:]
+
+def rotate(proj, angle):
+    """
+    Calculate `angle` degree(radian) rotated projection data whom [0, pi] degree data.
+    """
+    NoA, NoD = proj.shape
+    dth = math.pi / NoA
+    for i in xrange(NoA):
+        if dth * i > angle:
+            break
+        proj[i] *= -1
+
 
 def main():
     import sys
@@ -62,14 +75,20 @@ def main():
         sys.exit(1)
 
     angle_px = detector_px = width_px = img.shape[1]
-    detector_px -= 1
     A = Projector(width_px, angle_px, detector_px)
+    accA = projector.Projector(width_px, angle_px, detector_px)
     proj = utils.empty_proj(A)
     recon = utils.empty_img(A)
+    dbp = utils.empty_img(accA)
     A.forward(img, proj)
-    A.backward(proj, recon)
-    utils.show_image(proj)
-    utils.show_image(recon)
+    orig_proj = proj
+    for i in xrange(361):
+        proj = orig_proj.copy()
+        rotate(proj, math.pi/360*1*i)
+        accA.backward(proj, dbp)
+        recon += dbp
+        utils.show_image(proj)
+        print i
 
 if __name__ == '__main__':
     main()

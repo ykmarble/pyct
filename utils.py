@@ -45,6 +45,19 @@ def show_image(img, clim=None, output_path="saved_img.dat"):
     elif key == ord("s"):
         save_rawimage(img, "saved_img.dat")
         print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
+    return key
+
+def crop_elipse(img, center, r, value=0):
+
+    rx, ry = r
+    cx, cy = center
+    rx_2 = rx**2
+    ry_2 = ry**2
+
+    for yi in xrange(img.shape[1]):
+        for xi in xrange(img.shape[0]):
+            if (yi - cy)**2 / ry_2 + (xi - cx)**2 / rx_2 > 1:
+                img[yi, xi] = value
 
 def empty_img(A):
     return numpy.empty(A.get_image_shape())

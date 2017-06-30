@@ -34,7 +34,7 @@ def ramp_filter(proj):
 def inv_ramp_filter(proj):
     freq_proj = numpy.fft.fft(proj)
     NoA, NoD = freq_proj.shape
-    epsilon = 2. / NoD
+    epsilon = 1. / NoD
     maxfreq = int(math.floor(((NoD - 1) / 2 + 1) / 1.41421356))
     ramp = numpy.linspace(0, 2, NoD)
     ramp[:] = 1 / (ramp + epsilon)
@@ -42,22 +42,21 @@ def inv_ramp_filter(proj):
     freq_proj *= ramp[None, :]
     proj[:] = numpy.fft.ifft(freq_proj).real
 
-def shepp_logan_filter(proj):
+def shepp_logan_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
     filter = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
-    filter = 1 / (math.pi * (1 - 4 * filter ** 2))
+    filter = 1 / (math.pi * sample_rate ** 2 * (1 - 4 * filter ** 2))
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter, proj[i])[filter_width/2:filter_width/2+NoD]
 
-def ram_lak_filter(proj):
+def ram_lak_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
     even_index = ((filter_width - 1) / 2) % 2
     filter = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
-    filter = -2 / (math.pi * filter ** 2)
+    filter = -2 / (math.pi * filter ** 2 * sample_rate ** 2)
     filter[[i % 2 == even_index for i in xrange(filter_width)]] = 0
-    filter[filter_width / 2] = math.pi / 2
-    print filter
+    filter[filter_width / 2] = math.pi / 2 / sample_rate ** 2
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter, proj[i])[filter_width/2:filter_width/2+NoD]

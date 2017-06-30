@@ -2,9 +2,60 @@
 # -*- coding: utf-8 -*-
 
 from utils import *
-from projector import Projector
+import projector
+import differencial
+#from projector import Projector
+from differencial import Projector
 from math import ceil, floor
 import numpy
+
+def diff_calc_scale(A, subsets):
+    # けいさんめも｡
+    # 投影空間は普通に足して1/2
+    # 画像空間は上0.5と下0.5のpartial_backwardを足す
+    NoI, _ = A.get_image_shape()
+    NoA, NoD = A.get_projector_shape()
+    absorpA = projector.Projector(NoI, NoA, NoD+1)
+    a_ip = empty_proj(A)
+    a_pj_subset = [empty_img(A) for i in xrange(len(subsets))]
+
+    # calc a_i+
+    img = empty_img(absorpA)
+    proj = empty_proj(absorpA)
+    img[:, :] = 1
+    absorpA.forward(img, proj)
+    a_ip = 0.5 * (proj[:, :-1] + proj[:, 1:])
+
+    # calc a_+j
+    proj_u = zero_proj(absorpA)
+    proj_d = zero_proj(absorpA)
+    proj_u[:, :] = 0.5
+    proj_d[:, :] = 0.5
+    img_u = empty_img(absorpA)
+    img_d = empty_img(absorpA)
+    for i in xrange(len(subsets)):
+        absorpA.partial_backward(proj_u, img_u, subsets[i], None)
+        absorpA.partial_backward(proj_d, img_d, subsets[i], None)
+        a_pj_subset[i] = img_u + img_d
+        a_pj_subset[i][a_pj_subset[i]==0] = 1  # avoid zero-division
+
+    return a_ip, a_pj_subset
+
+def calc_scale(A, subsets):
+    # 吸収版｡
+    a_ip = empty_proj(A)
+    img = empty_img(A)
+    img[:, :] = 1
+    A.forward(img, a_ip)
+
+    a_pj_subset = [empty_img(A) for i in xrange(len(subsets))]
+    proj = empty_proj(A)
+    proj[:, :] = 1
+    for i in xrange(len(subsets)):
+        A.partial_backward(proj, a_pj_subset[i], subsets[i], None)
+        a_pj_subset[i][a_pj_subset[i]==0] = 1  # avoid zero-division
+
+    return a_ip, a_pj_subset
 
 def make_subset(NoA, n_subset):
     mod = NoA % n_subset
@@ -20,7 +71,19 @@ def make_subset(NoA, n_subset):
         t += unit_len
     return index2d
 
-def os_sart(A, data, n_subset, n_iter, recon=None, subsets=None, offset_i=0):
+def os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj):
+    alpha = 200. / (100 + i)
+    alpha = 100
+    i_subset = i % len(subsets)
+    cur_subset = subsets[i_subset]
+    A.partial_forward(recon, proj, cur_subset, None)
+    proj -= data
+    proj /= -a_ip
+    A.partial_backward(proj, img, cur_subset, None)
+    img /= a_pj_subset[i_subset]
+    recon += alpha * img
+
+def os_sart(A, data, n_subset, n_iter, recon=None):
     if recon is None:
         recon = empty_img(A)
         recon[:, :] = 0
@@ -28,39 +91,14 @@ def os_sart(A, data, n_subset, n_iter, recon=None, subsets=None, offset_i=0):
     proj = empty_proj(A)
 
     NoA, NoD = proj.shape
-    unit_len = NoA / n_subset
-    step = NoA / unit_len
-    if subsets is None:
-        subsets = make_subset(NoA, n_subset)
-    else:
-        assert len(subsets) == n_subset
+    subsets = make_subset(NoA, n_subset)
+    a_ip, a_pj_subset = diff_calc_scale(A, subsets)
 
-    # calc a_i+
-    a_ip = empty_proj(A)
-    img[:, :] = 1
-    A.forward(img, a_ip)
-
-    # calc a_+j for all subsets
-    a_pj_subset = [empty_img(A) for i in xrange(n_subset)]
-    proj[:, :] = 1
-    for i in xrange(n_subset):
-        A.partial_backward(proj, a_pj_subset[i], subsets[i], None)
-        a_pj_subset[i][a_pj_subset[i]==0] = 1
-
-    for i in xrange(offset_i, n_iter + offset_i):
-        alpha = 2000. / (1999 + i)
-        i_subset = i % n_subset
-        cur_subset = subsets[i_subset]
-        A.partial_forward(recon, proj, cur_subset, None)
-        proj -= data
-        proj /= -a_ip
-        A.partial_backward(proj, img, cur_subset, None)
-        img /= a_pj_subset[i_subset]
-        recon += alpha * img
-    return recon
+    for i in xrange(n_iter):
+        os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj)
 
 def tv_minimize(img, derivative):
-    epsilon = 1e-3
+    epsilon = 1e-4
     mu = numpy.full_like(img, epsilon**2)
     # [1:-2, 1:-2] (m, n)
     # [2:-1, 1:-2] (m+1, n)
@@ -78,11 +116,11 @@ def tv_minimize(img, derivative):
       + (img[1:-2, 1:-2] - img[2:-1, 1:-2]) / mu[2:-1, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 2:-1]) / mu[1:-2, 2:-1] \
       + (img[1:-2, 1:-2] - img[0:-3, 1:-2]) / mu[0:-3, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 0:-3]
 
-def os_sart_tv(A, data, alpha, n_iter, recon=None):
+def os_sart_tv(A, data, n_iter=1000, alpha=0.009, recon=None):
     if recon == None:
         recon = empty_img(A)
         recon[:, :] = 0
-    alpha_s = 0.997
+    alpha_s = 0.9999
     n_subset = 20
     n_tv = 5
     img = empty_img(A)
@@ -90,16 +128,21 @@ def os_sart_tv(A, data, alpha, n_iter, recon=None):
     NoA, NoD = proj.shape
     d = empty_img(A)
     subsets = make_subset(NoA, n_subset)
+    a_ip, a_pj_subset = diff_calc_scale(A, subsets)
     for i in xrange(n_iter):
-        print i
         for p_art in xrange(n_subset):
-            os_sart(A, data, 20, 1, recon=recon, subsets=subsets, offset_i=p_art+n_subset*i)
+            index = p_art+n_subset*i
+            os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, index, img, proj)
             for p_tv in xrange(n_tv):
                 tv_minimize(recon, d)
                 beta = numpy.max(recon)/numpy.max(d)
                 recon -= alpha * beta * d
                 alpha *= alpha_s
-        show_image(recon)
+            print index, recon[110, 110]
+            show_image(recon)
+            #show_image(recon, (0, 255))
+    save_rawimage(recon, "os_sart_1000.dat")
+    show_image(recon)
 
 def main():
     import sys
@@ -116,13 +159,16 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 0.6
+    scale = 1
     angle_px = detector_px = width_px = img.shape[1]
-    interiorA = Projector(width_px, angle_px, int(ceil(detector_px*scale)))
-    interiorA.update_detectors_length(ceil(detector_px * scale))
+    #interiorA = Projector(width_px, angle_px, int(ceil(detector_px*scale)))
+    #interiorA.update_detectors_length(ceil(detector_px * scale))
+    interiorA = Projector(width_px, 1300, 360)
+    interiorA.update_detectors_length(ceil(width_px * scale))
     proj = empty_proj(interiorA)
     interiorA.forward(img, proj)
-    os_sart_tv(interiorA, proj, 0.005, 1000)
+    print img[110, 110]
+    os_sart_tv(interiorA, proj, 1000)
 
 if __name__ == '__main__':
     main()
