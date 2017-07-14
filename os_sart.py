@@ -73,7 +73,7 @@ def make_subset(NoA, n_subset):
 
 def os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj):
     alpha = 200. / (100 + i)
-    alpha = 100
+    alpha = 0.9
     i_subset = i % len(subsets)
     cur_subset = subsets[i_subset]
     A.partial_forward(recon, proj, cur_subset, None)
@@ -116,11 +116,11 @@ def tv_minimize(img, derivative):
       + (img[1:-2, 1:-2] - img[2:-1, 1:-2]) / mu[2:-1, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 2:-1]) / mu[1:-2, 2:-1] \
       + (img[1:-2, 1:-2] - img[0:-3, 1:-2]) / mu[0:-3, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 0:-3]
 
-def os_sart_tv(A, data, n_iter=1000, alpha=0.009, recon=None):
+def os_sart_tv(A, data, n_iter=1000, alpha=0.005, recon=None):
     if recon == None:
         recon = empty_img(A)
         recon[:, :] = 0
-    alpha_s = 0.9999
+    alpha_s = 0.999987
     n_subset = 20
     n_tv = 5
     img = empty_img(A)
@@ -138,11 +138,9 @@ def os_sart_tv(A, data, n_iter=1000, alpha=0.009, recon=None):
                 beta = numpy.max(recon)/numpy.max(d)
                 recon -= alpha * beta * d
                 alpha *= alpha_s
-            print index, recon[110, 110]
-            show_image(recon)
-            #show_image(recon, (0, 255))
-    save_rawimage(recon, "os_sart_1000.dat")
-    show_image(recon)
+        print i, recon[128, 128]
+        if (i + 1) % 500 == 0:
+            save_rawimage(recon, "output/os_sart_{}.dat".format(i+1))
 
 def main():
     import sys
@@ -159,16 +157,14 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 1
+    scale = 0.65
     angle_px = detector_px = width_px = img.shape[1]
-    #interiorA = Projector(width_px, angle_px, int(ceil(detector_px*scale)))
-    #interiorA.update_detectors_length(ceil(detector_px * scale))
-    interiorA = Projector(width_px, 1300, 360)
+    interiorA = Projector(width_px, angle_px, detector_px)
     interiorA.update_detectors_length(ceil(width_px * scale))
     proj = empty_proj(interiorA)
     interiorA.forward(img, proj)
-    print img[110, 110]
-    os_sart_tv(interiorA, proj, 1000)
+    print img[128, 128]
+    os_sart_tv(interiorA, proj, 10000)
 
 if __name__ == '__main__':
     main()

@@ -70,3 +70,14 @@ def zero_img(A):
 
 def zero_proj(A):
     return numpy.zeros(A.get_projector_shape())
+
+def draw_graph(data, canvas):
+    d_mini, d_maxi = numpy.min(data), numpy.max(data)
+    c_height, c_width = canvas.shape
+    assert len(data) == c_width
+    canvas[:, :] = 1
+    for i in xrange(c_width):
+        h = round((data[i] - d_mini) / float(d_maxi - d_mini) * (c_height - 1))  # 0 <= h <= c_height - 1
+        h = int(c_height - h - 1)
+        canvas[h, i] = 0
+    return d_mini, d_maxi

@@ -34,11 +34,12 @@ def ramp_filter(proj):
 def inv_ramp_filter(proj):
     freq_proj = numpy.fft.fft(proj)
     NoA, NoD = freq_proj.shape
-    epsilon = 1. / NoD
     maxfreq = int(math.floor(((NoD - 1) / 2 + 1) / 1.41421356))
     ramp = numpy.linspace(0, 2, NoD)
-    ramp[:] = 1 / (ramp + epsilon)
+    ramp[1:] = 1. / ramp[1:]
+    ramp[0] = 2 * ramp[1] - ramp[2]
     ramp[maxfreq:] = 0
+    ramp *= 2
     freq_proj *= ramp[None, :]
     proj[:] = numpy.fft.ifft(freq_proj).real
 
