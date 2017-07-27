@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
 import numpy
 cimport numpy
@@ -99,11 +100,11 @@ class Projector(object):
 
     def forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj):
         assert self.is_valid_dimension(img, proj)
-        self.projection(img, proj, False)
+        self.projection2(img, proj, False)
 
     def backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img):
         assert self.is_valid_dimension(img, proj)
-        self.projection(proj, img, True)
+        self.projection2(proj, img, True)
 
     def partial_forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
@@ -151,7 +152,8 @@ class Projector(object):
         dr = self.dr
         dtheta = self.dtheta
 
-        for ti_i in prange(NoA, nogil=True):
+        #for ti_i in prange(NoA, nogil=True):
+        for ti_i in range(NoA):
             ti = th_indexes[ti_i]
             th = ti * dtheta
             sin_th = sin(th)
@@ -205,14 +207,74 @@ class Projector(object):
 
                         if (backward):
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[yi, xi] = dst[yi, xi] + aij * src[ti, ri] * inv_abs_sin
+                                dst[yi, xi] +=  aij * src[ti, ri] * inv_abs_sin
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
-                                dst[yi, xi+1] = dst[yi, xi+1] + aijp * src[ti, ri] * inv_abs_sin
+                                dst[yi, xi+1] += aijp * src[ti, ri] * inv_abs_sin
                         else:
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] = dst[ti, ri] + aij * src[yi, xi] * inv_abs_sin
+                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_sin
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] = dst[ti, ri] + aijp * src[yi, xi+1] * inv_abs_sin
+                                dst[ti, ri] += aijp * src[yi, xi+1] * inv_abs_sin
+
+    @cython.boundscheck(False)
+    def projection2(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
+                    numpy.ndarray[numpy.int_t, ndim=1] th_indexes=None,
+                    numpy.ndarray[numpy.int_t, ndim=1] r_indexes=None):
+        cdef int NoI, NoA, NoD
+        cdef DTYPE_t center_x, center_y, detectors_center, dr, dtheta
+        cdef int th_i, ti, xi, yi, l, h
+        cdef DTYPE_t th, a, b, x, y, dist, dist_on_det, l_ratio, h_ratio, val
+
+        if th_indexes is None:
+            th_indexes = self.all_th_indexes
+        if r_indexes is None:
+            r_indexes = self.all_r_indexes
+
+        dst[:, :] = 0
+        NoI = self.NoI
+        NoA = th_indexes.shape[0]
+        NoD = r_indexes.shape[0]
+        center_x = self.center_x
+        center_y = self.center_y
+        detectors_center = self.detectors_center
+        dr = self.dr
+        dtheta = self.dtheta
+
+        #for th_i in prange(NoA, nogil=True):
+        for th_i in range(NoA):
+
+            ti = th_indexes[th_i]
+            th = ti * dtheta
+
+            # 原点を通る検知器列に直行する直線 ax + by = 0
+            a = sin(th)
+            b = -cos(th)
+
+            for xi in xrange(NoI):
+                for yi in xrange(NoI):
+
+                    x = xi - center_x
+                    y = center_y - yi  # 行列表記と軸の方向が逆になることに注意
+
+                    # distは検知器中心からの距離で、X線源に向かって左側を正とするローカル座標で表されている。
+                    dist = a * x + b * y
+                    dist_on_det = dist / dr + detectors_center
+                    l = int(floor(dist_on_det))
+                    h = l + 1
+                    l_ratio = h - dist_on_det
+                    h_ratio = 1 - l_ratio
+
+                    if (backward):
+                        if (0 <= l and l < NoD):
+                            dst[yi, xi] += src[ti, l] * l_ratio
+                        if (0 <= h and h < NoD):
+                            dst[yi, xi] += src[ti, h] * h_ratio
+                    else:
+                        if (0 <= l and l < NoD):
+                            dst[ti, l] += src[yi, xi] * l_ratio
+                        if (0 <= h and h < NoD):
+                            dst[ti, h] += src[yi, xi] * h_ratio
+
 
 cdef inline int is_valid_index(int xi, int yi, double center_x, double center_y, int NoI) nogil:
     cdef double x = xi - center_x
