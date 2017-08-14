@@ -120,11 +120,11 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
     img = utils.zero_img(A)
     proj = utils.zero_proj(A)
 
-    interior_w = data.shape[1]
-    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
+    #interior_w = data.shape[1]
+    #interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
     #recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
     #recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
-    recon_proj[:, interior_pad:interior_pad + interior_w] = data
+    #recon_proj[:, interior_pad:interior_pad + interior_w] = data
     #recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
     #recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
 
@@ -137,11 +137,12 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
 
     for i in xrange(niter):
         A.forward(recon, proj)
+        utils.show_image(proj)
         proj -= recon_proj
         #fbp.cut_filter(proj)
         #fbp.ramp_filter(proj)
         #fbp.ram_lak_filter(proj, sample_rate)
-        fbp.shepp_logan_filter(proj, sample_rate)
+        #fbp.shepp_logan_filter(proj, sample_rate)
         #fbp.inv_ramp_filter(proj)
         mu_bar = mu + sigma * proj
         A.backward(mu_bar, img)
@@ -153,7 +154,8 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
         tv_denoise(recon, tau / alpha)
 
         recon_proj -= tau * mu_bar
-        recon_proj[:, interior_pad:interior_pad + interior_w] = data
+        #recon_proj[:, interior_pad:interior_pad + interior_w] = data
+        recon_proj[data != float("inf")] = data[data != float("inf")]
 
         A.forward(recon, proj)
         iter_callback(i, recon, recon_proj, mu)
@@ -162,7 +164,7 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
         #fbp.cut_filter(proj)
         #fbp.ramp_filter(proj)
         #fbp.ram_lak_filter(proj, sample_rate)
-        fbp.shepp_logan_filter(proj, sample_rate)
+        #fbp.shepp_logan_filter(proj, sample_rate)
         #fbp.inv_ramp_filter(proj)
         mu += sigma * proj
 
@@ -239,8 +241,13 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 0.7
+    scale = 1
     angle_px = detector_px = width_px = img.shape[1]
+
+    mask = numpy.zeros_like(img)
+    mask_c = (10 + (mask.shape[0] - 1) / 2.0, 5 +(mask.shape[1] - 1) / 2.0)
+    create_elipse_mask(mask_c, 5, 8, mask, float("inf"))
+    img += mask
 
     # interior projection
     interiorA = Projector(width_px, angle_px, detector_px)
@@ -272,13 +279,15 @@ def main():
         print i, x[128, 128], numpy.sum(numpy.sqrt(((x - img)*roi)**2))
         #utils.show_image(x*roi, clim=(1., 1.1))
         utils.show_image(x, clim=(0., 2.))
+        #utils.show_image(y)
         #for j in xrange(len(argv)):
         #    utils.show_image(argv[j])
 
     print img[128, 128]
 
     #recon = app_recon(interiorA, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
-    recon = fullapp_recon(A, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
+    #recon = fullapp_recon(A, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
+    recon = fullapp_recon(A, proj, 0.0035, 0.0035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
 
 if __name__ == '__main__':
     main()
