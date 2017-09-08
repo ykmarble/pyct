@@ -137,7 +137,6 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
 
     for i in xrange(niter):
         A.forward(recon, proj)
-        utils.show_image(proj)
         proj -= recon_proj
         #fbp.cut_filter(proj)
         #fbp.ramp_filter(proj)
@@ -244,10 +243,11 @@ def main():
     scale = 1
     angle_px = detector_px = width_px = img.shape[1]
 
-    mask = numpy.zeros_like(img)
-    mask_c = (10 + (mask.shape[0] - 1) / 2.0, 5 +(mask.shape[1] - 1) / 2.0)
-    create_elipse_mask(mask_c, 5, 8, mask, float("inf"))
-    img += mask
+    # define metal material inner image
+    img_mask = numpy.zeros_like(img)
+    mask_c = (10 + (img_mask.shape[0] - 1) / 2.0, 5 +(img_mask.shape[1] - 1) / 2.0)
+    create_elipse_mask(mask_c, 5, 8, img_mask, float("inf"))
+    img += img_mask
 
     # interior projection
     interiorA = Projector(width_px, angle_px, detector_px)
@@ -267,6 +267,10 @@ def main():
     interior_pad = (full_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
     proj = full_proj[:, interior_pad:interior_pad + interior_w]
 
+    # get metal mask of projection domain
+    proj_mask = numpy.zeros_like(proj, numpy.int)
+    proj_mask[proj == float("inf")] = 1
+
     # create roi mask
     roi = utils.zero_img(A)
     roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
@@ -278,13 +282,14 @@ def main():
         y = argv[1]
         print i, x[128, 128], numpy.sum(numpy.sqrt(((x - img)*roi)**2))
         #utils.show_image(x*roi, clim=(1., 1.1))
-        utils.show_image(x, clim=(0., 2.))
+        utils.show_image(x, clim=(1., 1.1))
         #utils.show_image(y)
         #for j in xrange(len(argv)):
         #    utils.show_image(argv[j])
 
-    print img[128, 128]
-
+    utils.show_image(img, clim=(1., 1.1))
+    utils.show_image(proj, clim=(0, 300))
+    recon = img * 0
     #recon = app_recon(interiorA, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
     #recon = fullapp_recon(A, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
     recon = fullapp_recon(A, proj, 0.0035, 0.0035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)

@@ -100,11 +100,11 @@ class Projector(object):
 
     def forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj):
         assert self.is_valid_dimension(img, proj)
-        self.projection2(img, proj, False)
+        self._projection(img, proj, False)
 
     def backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img):
         assert self.is_valid_dimension(img, proj)
-        self.projection2(proj, img, True)
+        self._projection(proj, img, True)
 
     def partial_forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
@@ -114,22 +114,33 @@ class Projector(object):
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
         if r_indexes is not None:
             assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self.projection(img, proj, False, th_indexes, r_indexes)
+        self._projection(img, proj, False, th_indexes=th_indexes, r_indexes=r_indexes)
 
     def partial_backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
-                        numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
-                        numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
+                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
+                         numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
         assert self.is_valid_dimension(img, proj)
         if th_indexes is not None:
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
         if r_indexes is not None:
             assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self.projection(proj, img, True, th_indexes, r_indexes)
+        self._projection(proj, img, True, th_indexes=th_indexes, r_indexes=r_indexes)
+
+    def forward_with_mask(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
+                          numpy.ndarray[numpy.int_t, ndim=2] mask):
+        assert self.is_valid_dimension(img, proj)
+        self._projection(img, proj, False, mask)
+
+    def backward_with_mask(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
+                          numpy.ndarray[numpy.int_t, ndim=2] mask):
+        assert self.is_valid_dimension(img, proj)
+        self._projection(proj, img, True, mask)
 
     @cython.boundscheck(False)
-    def projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
-                   numpy.ndarray[numpy.int_t, ndim=1] th_indexes=None,
-                   numpy.ndarray[numpy.int_t, ndim=1] r_indexes=None):
+    def _projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward,
+                    numpy.ndarray[numpy.int_t, ndim=2] mask=None,
+                    numpy.ndarray[numpy.int_t, ndim=1] th_indexes=None,
+                    numpy.ndarray[numpy.int_t, ndim=1] r_indexes=None):
         cdef int ti, ri, xi, yi, ti_i, ri_i
         cdef DTYPE_t th, sin_th, cos_th, abs_sin, abs_cos, sin_cos, cos_sin,
         cdef DTYPE_t inv_cos_th, inv_abs_cos, inv_sin_th, inv_abs_sin
@@ -137,6 +148,8 @@ class Projector(object):
         cdef int NoI, NoA, NoD
         cdef DTYPE_t center_x, center_y, detectors_center, dr, dtheta
 
+        if mask is None:
+            mask = numpy.zeros_like(src, numpy.int)
         if th_indexes is None:
             th_indexes = self.all_th_indexes
         if r_indexes is None:
@@ -152,8 +165,8 @@ class Projector(object):
         dr = self.dr
         dtheta = self.dtheta
 
-        #for ti_i in prange(NoA, nogil=True):
-        for ti_i in range(NoA):
+        for ti_i in prange(NoA, nogil=True):
+        #for ti_i in range(NoA):
             ti = th_indexes[ti_i]
             th = ti * dtheta
             sin_th = sin(th)
@@ -180,14 +193,14 @@ class Projector(object):
 
                         if (backward):
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[yi, xi] = dst[yi, xi] + aij * src[ti, ri] * inv_abs_cos
+                                dst[yi, xi] += aij * src[ti, ri] * inv_abs_cos if mask[ti, ri] == 0 else 0
                             if (is_valid_index(xi, yi+1, center_x, center_y, NoI)):
-                                dst[yi+1, xi] = dst[yi+1, xi] + aijp * src[ti, ri] * inv_abs_cos
+                                dst[yi+1, xi] += aijp * src[ti, ri] * inv_abs_cos if mask[ti, ri] == 0 else 0
                         else:
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] = dst[ti, ri] + aij * src[yi, xi] * inv_abs_cos
+                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_cos if mask[yi, xi] == 0 else 0
                             if (is_valid_index(xi, yi+1, center_x, center_y, NoI)):
-                                dst[ti, ri] = dst[ti, ri] + aijp * src[yi+1, xi] * inv_abs_cos
+                                dst[ti, ri] += aijp * src[yi+1, xi] * inv_abs_cos if mask[yi+1, xi] == 0 else 0
             else:
                 cos_sin = cos_th / sin_th
                 inv_sin_th = 1 / sin_th
@@ -207,17 +220,17 @@ class Projector(object):
 
                         if (backward):
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[yi, xi] +=  aij * src[ti, ri] * inv_abs_sin
+                                dst[yi, xi] +=  aij * src[ti, ri] * inv_abs_sin if mask[ti, ri] == 0 else 0
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
-                                dst[yi, xi+1] += aijp * src[ti, ri] * inv_abs_sin
+                                dst[yi, xi+1] += aijp * src[ti, ri] * inv_abs_sin if mask[ti, ri] == 0 else 0
                         else:
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_sin
+                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_sin if mask[yi, xi] == 0 else 0
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] += aijp * src[yi, xi+1] * inv_abs_sin
+                                dst[ti, ri] += aijp * src[yi, xi+1] * inv_abs_sin if mask[yi, xi+1] == 0 else 0
 
     @cython.boundscheck(False)
-    def projection2(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
+    def _projection2(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
                     numpy.ndarray[numpy.int_t, ndim=1] th_indexes=None,
                     numpy.ndarray[numpy.int_t, ndim=1] r_indexes=None):
         cdef int NoI, NoA, NoD
