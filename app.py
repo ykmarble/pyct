@@ -56,26 +56,6 @@ def tv_denoise(img, alpha, max_iter=1000, mask=None):
         last_div_p, div_p = div_p, last_div_p
     img -= div_p * alpha
 
-def create_elipse_mask(center, a, b, out, value=1):
-    """
-    Create a array which contains a elipse.
-    Inside the elipse are filled by 1.
-    The others are 0.
-    @shape : the shape of return array
-    @center : the center point of the elipse
-    @a : the radius of x-axis
-    @b : the radius of y-axis
-    """
-    x, y = center
-    a_2 = a**2.
-    b_2 = b**2.
-    ab_2 = a_2 * b_2
-    out[:, :] = 0
-    for xi in xrange(out.shape[1]):
-        for yi in xrange(out.shape[0]):
-            if a_2 * (y - yi)**2 + b_2 * (x - xi)**2 < ab_2:
-                out[yi, xi] = value
-
 def vcoord(shape, point):
     """
     Convert the coordinate systems from 2D-array to the virtual system, taken as arguments.
@@ -98,7 +78,7 @@ def acoord(shape, point):
     return (x + w/2., h/2. - y)
 
 def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
-              iter_callback=lambda *arg: 0):
+              iter_callback=lambda *arg: 0, filtering=False):
     """
     Perform interior CT image reconstruction with APP method.
     @A : system matrix class
@@ -119,32 +99,40 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
     #recon_proj += (numpy.max(data) + numpy.min(data)) / 2.
     img = utils.zero_img(A)
     proj = utils.zero_proj(A)
+    proj_mask = numpy.zeros_like(data, numpy.int)
+    proj_mask[data == float("inf")] = 1
 
-    #interior_w = data.shape[1]
-    #interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
-    #recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
-    #recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
-    #recon_proj[:, interior_pad:interior_pad + interior_w] = data
-    #recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
-    #recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
+    interior_w = data.shape[1]
+    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
+
+    # create initial projection data
+    recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
+    recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
+
+    recon_proj[:, interior_pad:interior_pad + interior_w] = data
+
+    recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
+    recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
 
     elipse_center = numpy.array(recon.shape) / 2.
     elipse_r = numpy.array(recon.shape) / 2.1
     elipse = img.copy()
-    create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
+    #utils.create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
+    utils.create_elipse_mask(elipse_center, elipse_r[0]*1.5, elipse_r[1]*1.5, elipse) # Abd
     elipse = elipse < 0.5
-    alpha = 0.5
+    alpha = 0.001
+    utils.show_image(recon_proj)
 
     for i in xrange(niter):
         A.forward(recon, proj)
         proj -= recon_proj
-        #fbp.cut_filter(proj)
-        #fbp.ramp_filter(proj)
-        #fbp.ram_lak_filter(proj, sample_rate)
-        #fbp.shepp_logan_filter(proj, sample_rate)
-        #fbp.inv_ramp_filter(proj)
+        if filtering:
+            fbp.ramp_filter(proj)
+            #fbp.ram_lak_filter(proj, sample_rate)
+            #fbp.shepp_logan_filter(proj, sample_rate)
+            #fbp.inv_ramp_filter(proj)
         mu_bar = mu + sigma * proj
-        A.backward(mu_bar, img)
+        A.backward_with_mask(mu_bar, img, proj_mask)
         recon -= tau * img
 
         # insert support constraint
@@ -153,24 +141,25 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
         tv_denoise(recon, tau / alpha)
 
         recon_proj -= tau * mu_bar
-        #recon_proj[:, interior_pad:interior_pad + interior_w] = data
-        recon_proj[data != float("inf")] = data[data != float("inf")]
+        recon_proj[:, interior_pad:interior_pad + interior_w] = data
+        #recon_proj[data != float("inf")] = data[data != float("inf")]
 
         A.forward(recon, proj)
         iter_callback(i, recon, recon_proj, mu)
         # insert phase differential
         proj -= recon_proj
-        #fbp.cut_filter(proj)
-        #fbp.ramp_filter(proj)
-        #fbp.ram_lak_filter(proj, sample_rate)
-        #fbp.shepp_logan_filter(proj, sample_rate)
-        #fbp.inv_ramp_filter(proj)
+        if filtering:
+            fbp.ramp_filter(proj)
+            #fbp.ram_lak_filter(proj, sample_rate)
+            #fbp.shepp_logan_filter(proj, sample_rate)
+            #fbp.inv_ramp_filter(proj)
+        utils.show_image(proj)
         mu += sigma * proj
 
     return recon
 
 def app_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
-              iter_callback=lambda *arg: 0):
+              iter_callback=lambda *arg: 0, filtering=False):
     """
     Perform interior CT image reconstruction with APP method.
     @A : system matrix class
@@ -192,17 +181,19 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
     elipse_center = numpy.array(recon.shape) / 2.
     elipse_r = numpy.array(recon.shape) / 2.1
     elipse = img.copy()
-    create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
+    #utils.create_elipse_mask(elipse_center, elipse_r[0]*10/11, elipse_r[1]*1.1, elipse) # SLp
+    utils.create_elipse_mask(elipse_center, elipse_r[0]*1.5, elipse_r[1]*1.5, elipse) # Abd
     elipse = elipse < 0.5
-    alpha = 0.5
+    alpha = 0.001
 
     for i in xrange(niter):
         A.forward(recon, proj)
         proj -= data
-        #fbp.ramp_filter(proj)
-        #fbp.ram_lak_filter(proj, sample_rate)
-        fbp.shepp_logan_filter(proj, sample_rate)
-        #fbp.inv_ramp_filter(proj)
+        if filtering:
+            fbp.ramp_filter(proj)
+            #fbp.ram_lak_filter(proj, sample_rate)
+            #fbp.shepp_logan_filter(proj, sample_rate)
+            #fbp.inv_ramp_filter(proj)
         mu_bar = mu + sigma * proj
         A.backward(mu_bar, img)
         recon -= tau * img
@@ -216,10 +207,11 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
         iter_callback(i, recon, mu, proj)
         # insert phase differential
         proj -= data
-        #fbp.ramp_filter(proj)
-        #fbp.ram_lak_filter(proj, sample_rate)
-        fbp.shepp_logan_filter(proj, sample_rate)
-        #fbp.inv_ramp_filter(proj)
+        if filtering:
+            fbp.ramp_filter(proj)
+            #fbp.ram_lak_filter(proj, sample_rate)
+            #fbp.shepp_logan_filter(proj, sample_rate)
+            #fbp.inv_ramp_filter(proj)
         mu += sigma * proj
 
     return recon
@@ -240,14 +232,14 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 1
+    scale = 0.4
     angle_px = detector_px = width_px = img.shape[1]
 
-    # define metal material inner image
-    img_mask = numpy.zeros_like(img)
-    mask_c = (10 + (img_mask.shape[0] - 1) / 2.0, 5 +(img_mask.shape[1] - 1) / 2.0)
-    create_elipse_mask(mask_c, 5, 8, img_mask, float("inf"))
-    img += img_mask
+    ## define metal material inner image
+    #img_mask = numpy.zeros_like(img)
+    #mask_c = (10 + (img_mask.shape[0] - 1) / 2.0, 5 +(img_mask.shape[1] - 1) / 2.0)
+    #utils.create_elipse_mask(mask_c, 5, 8, img_mask, float("inf"))
+    #img += img_mask
 
     # interior projection
     interiorA = Projector(width_px, angle_px, detector_px)
@@ -262,37 +254,51 @@ def main():
     full_proj = utils.zero_proj(A)
     A.forward(img, full_proj)
 
+    polar_img = numpy.zeros((width_px, width_px))
+
     # truncate global projection
     interior_w = proj.shape[1]
     interior_pad = (full_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
-    proj = full_proj[:, interior_pad:interior_pad + interior_w]
+    #proj = full_proj[:, interior_pad:interior_pad + interior_w]
 
-    # get metal mask of projection domain
-    proj_mask = numpy.zeros_like(proj, numpy.int)
-    proj_mask[proj == float("inf")] = 1
+    ## get metal mask of projection domain
+    #proj_mask = numpy.zeros_like(proj, numpy.int)
+    #proj_mask[proj == float("inf")] = 1
 
     # create roi mask
     roi = utils.zero_img(A)
     roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
     roi_r = (roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.)
-    create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
+    utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
     def callback(i, *argv):
         x = argv[0]
         y = argv[1]
         print i, x[128, 128], numpy.sum(numpy.sqrt(((x - img)*roi)**2))
-        #utils.show_image(x*roi, clim=(1., 1.1))
-        utils.show_image(x, clim=(1., 1.1))
+        if i %10 == 0:
+            return
+            utils.show_image(x, clim=(-128, 256))
+            utils.show_image(y)
         #utils.show_image(y)
         #for j in xrange(len(argv)):
         #    utils.show_image(argv[j])
 
-    utils.show_image(img, clim=(1., 1.1))
-    utils.show_image(proj, clim=(0, 300))
     recon = img * 0
-    #recon = app_recon(interiorA, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
-    #recon = fullapp_recon(A, proj, 0.035, 0.035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
-    recon = fullapp_recon(A, proj, 0.0035, 0.0035, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
+
+    utils.show_image(proj)
+    utils.reshape_to_polar(proj, polar_img)
+
+    # without filter
+    #alpha = 0.004
+    #alpha = 0.0034
+    #recon = app_recon(interiorA, proj, alpha, alpha,1000, iter_callback=callback, sample_rate=scale*1.41421356) # 1635498
+
+    # with filter
+    #alpha = 0.0465
+    #alpha = 0.024
+    alpha = 0.0024
+    #recon = app_recon(interiorA, proj, alpha, alpha, 1000, iter_callback=callback, sample_rate=scale*1.41421356, filtering=True) # 201435.93 400 iter
+    recon = fullapp_recon(A, proj, alpha, alpha, 1000, iter_callback=callback, sample_rate=scale*1.41421356)
 
 if __name__ == '__main__':
     main()

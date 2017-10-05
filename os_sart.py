@@ -3,9 +3,9 @@
 
 from utils import *
 import projector
-import differencial
-#from projector import Projector
-from differencial import Projector
+#import differencial
+from projector import Projector
+#from differencial import Projector
 from math import ceil, floor
 import numpy
 
@@ -54,13 +54,17 @@ def calc_scale(A, subsets):
     for i in xrange(len(subsets)):
         A.partial_backward(proj, a_pj_subset[i], subsets[i], None)
         a_pj_subset[i][a_pj_subset[i]==0] = 1  # avoid zero-division
+        #print numpy.min(a_pj_subset[i]), numpy.max(a_pj_subset[i])
+        #show_image(a_pj_subset[i])
 
     return a_ip, a_pj_subset
 
 def make_subset(NoA, n_subset):
     mod = NoA % n_subset
-    index1d = numpy.random.permutation(NoA)
     unit_len = NoA / n_subset
+    w = (NoA+mod)/n_subset
+    h = n_subset
+    index1d = numpy.array([j*h + i for i in xrange(h) for j in xrange(w) if j*h + i < NoA])
     h, t = 0, unit_len
     index2d = []
     for i in xrange(n_subset):
@@ -69,10 +73,11 @@ def make_subset(NoA, n_subset):
         index2d.append(index1d[h:t])
         h = t
         t += unit_len
+    #numpy.random.shuffle(index2d)
     return index2d
 
 def os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj):
-    alpha = 200. / (100 + i)
+    alpha = 200. / (100. + i)
     alpha = 0.9
     i_subset = i % len(subsets)
     cur_subset = subsets[i_subset]
@@ -83,7 +88,7 @@ def os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj):
     img /= a_pj_subset[i_subset]
     recon += alpha * img
 
-def os_sart(A, data, n_subset, n_iter, recon=None):
+def os_sart(A, data, n_subset=1, n_iter=1000, recon=None, iter_callback=lambda *x: None):
     if recon is None:
         recon = empty_img(A)
         recon[:, :] = 0
@@ -92,10 +97,12 @@ def os_sart(A, data, n_subset, n_iter, recon=None):
 
     NoA, NoD = proj.shape
     subsets = make_subset(NoA, n_subset)
-    a_ip, a_pj_subset = diff_calc_scale(A, subsets)
+    a_ip, a_pj_subset = calc_scale(A, subsets)
 
     for i in xrange(n_iter):
         os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj)
+        iter_callback(i, recon)
+
 
 def tv_minimize(img, derivative):
     epsilon = 1e-4
@@ -116,7 +123,7 @@ def tv_minimize(img, derivative):
       + (img[1:-2, 1:-2] - img[2:-1, 1:-2]) / mu[2:-1, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 2:-1]) / mu[1:-2, 2:-1] \
       + (img[1:-2, 1:-2] - img[0:-3, 1:-2]) / mu[0:-3, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 0:-3]
 
-def os_sart_tv(A, data, n_iter=1000, alpha=0.005, recon=None):
+def os_sart_tv(A, data, n_iter=1000, alpha=0.005, recon=None, iter_callback=lambda *x: None):
     if recon == None:
         recon = empty_img(A)
         recon[:, :] = 0
@@ -128,7 +135,7 @@ def os_sart_tv(A, data, n_iter=1000, alpha=0.005, recon=None):
     NoA, NoD = proj.shape
     d = empty_img(A)
     subsets = make_subset(NoA, n_subset)
-    a_ip, a_pj_subset = diff_calc_scale(A, subsets)
+    a_ip, a_pj_subset = calc_scale(A, subsets)
     for i in xrange(n_iter):
         for p_art in xrange(n_subset):
             index = p_art+n_subset*i
@@ -138,9 +145,7 @@ def os_sart_tv(A, data, n_iter=1000, alpha=0.005, recon=None):
                 beta = numpy.max(recon)/numpy.max(d)
                 recon -= alpha * beta * d
                 alpha *= alpha_s
-        print i, recon[128, 128]
-        if (i + 1) % 500 == 0:
-            save_rawimage(recon, "output/os_sart_{}.dat".format(i+1))
+        iter_callback(i, recon)
 
 def main():
     import sys
@@ -157,14 +162,27 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 0.65
+    scale = 0.4
     angle_px = detector_px = width_px = img.shape[1]
     interiorA = Projector(width_px, angle_px, detector_px)
     interiorA.update_detectors_length(ceil(width_px * scale))
     proj = empty_proj(interiorA)
     interiorA.forward(img, proj)
     print img[128, 128]
-    os_sart_tv(interiorA, proj, 10000)
+
+    # create roi mask
+    roi = zero_img(interiorA)
+    roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
+    roi_r = (roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.)
+    create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
+
+    def callback(i, x):
+        print i ,x[128, 128], numpy.sum(numpy.sqrt(((x-img)*roi)**2))
+        if i % 10 == 0:
+            show_image(x*roi, clim=(-128, 256))
+
+    ### CAUTION: check if scale calculataion function is properly selected (in os_sart(_tv))###
+    os_sart_tv(interiorA, proj, n_iter=1000, iter_callback=callback) # 1497866
 
 if __name__ == '__main__':
     main()

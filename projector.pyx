@@ -193,14 +193,14 @@ class Projector(object):
 
                         if (backward):
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[yi, xi] += aij * src[ti, ri] * inv_abs_cos if mask[ti, ri] == 0 else 0
+                                dst[yi, xi] += aij * src[ti, ri] * inv_abs_cos
                             if (is_valid_index(xi, yi+1, center_x, center_y, NoI)):
-                                dst[yi+1, xi] += aijp * src[ti, ri] * inv_abs_cos if mask[ti, ri] == 0 else 0
+                                dst[yi+1, xi] += aijp * src[ti, ri] * inv_abs_cos
                         else:
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_cos if mask[yi, xi] == 0 else 0
+                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_cos
                             if (is_valid_index(xi, yi+1, center_x, center_y, NoI)):
-                                dst[ti, ri] += aijp * src[yi+1, xi] * inv_abs_cos if mask[yi+1, xi] == 0 else 0
+                                dst[ti, ri] += aijp * src[yi+1, xi] * inv_abs_cos
             else:
                 cos_sin = cos_th / sin_th
                 inv_sin_th = 1 / sin_th
@@ -220,14 +220,14 @@ class Projector(object):
 
                         if (backward):
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[yi, xi] +=  aij * src[ti, ri] * inv_abs_sin if mask[ti, ri] == 0 else 0
+                                dst[yi, xi] +=  aij * src[ti, ri] * inv_abs_sin
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
-                                dst[yi, xi+1] += aijp * src[ti, ri] * inv_abs_sin if mask[ti, ri] == 0 else 0
+                                dst[yi, xi+1] += aijp * src[ti, ri] * inv_abs_sin
                         else:
                             if (is_valid_index(xi, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_sin if mask[yi, xi] == 0 else 0
+                                dst[ti, ri] += aij * src[yi, xi] * inv_abs_sin
                             if (is_valid_index(xi+1, yi, center_x, center_y, NoI)):
-                                dst[ti, ri] += aijp * src[yi, xi+1] * inv_abs_sin if mask[yi, xi+1] == 0 else 0
+                                dst[ti, ri] += aijp * src[yi, xi+1] * inv_abs_sin
 
     @cython.boundscheck(False)
     def _projection2(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward=False,
