@@ -294,4 +294,4 @@ cdef inline int is_valid_index(int xi, int yi, double center_x, double center_y,
     cdef double y = center_y - yi
     return 0 <= xi and xi < NoI \
       and 0 <= yi and yi < NoI \
-      and 4 * (x * x + y * y) < NoI * NoI
+      and 4 * (x * x + y * y) < (NoI - 1) * (NoI -1)

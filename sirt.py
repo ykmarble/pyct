@@ -4,6 +4,7 @@ import numpy
 import utils
 import projector
 import sys
+from numpy import ceil
 
 def sirt(A, data, niter=1000, recon=None):
     if recon == None:
@@ -11,16 +12,17 @@ def sirt(A, data, niter=1000, recon=None):
         recon[:, :] = 0
     img = utils.empty_img(A)
     proj = utils.empty_proj(A)
-    alpha = 0.00003
+    alpha = 0.000005
 
     for i in xrange(niter):
         A.forward(recon, proj)
         proj -= data
         print i, numpy.min(proj), numpy.max(proj)
-        utils.show_image(proj)
-        utils.show_image(recon, clim=(-128, 256))
         A.backward(proj, img)
         recon -= alpha * img
+        if i == 50:
+            utils.save_rawimage(recon, "sirt.dat")
+            sys.exit()
     return
 
 def main():
@@ -32,13 +34,13 @@ def main():
     if img is None:
         print "Invalid file."
         return
+    scale = 0.6
     NoI = img.shape[0]
     NoD = NoA = NoI
     proj = numpy.empty((NoA, NoD))
     A = projector.Projector(NoI, NoA, NoD)
+    A.update_detectors_length(NoI * scale)
     A.forward(img, proj)
-    utils.show_image(img)
-    utils.show_image(proj)
     sirt(A, proj)
 
 if __name__ == "__main__":

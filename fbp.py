@@ -13,11 +13,10 @@ def fbp(A, proj, recon):
     freq_proj *= ramp[None, :]
     A.backward(numpy.fft.ifft(freq_proj).real, recon)
 
-def cut_filter(proj):
+def cut_filter(proj, maxfreq):
     freq_proj = numpy.fft.fft(proj)
     NoA, NoD = freq_proj.shape
-    maxfreq = int(math.floor(((NoD - 1) / 2 + 1) / 1.41421356))
-    ramp = numpy.ones(NoD)
+    ramp = numpy.ones(NoD, dtype=float)
     ramp[maxfreq:] = 0
     freq_proj *= ramp[None, :]
     proj[:] = numpy.fft.ifft(freq_proj).real

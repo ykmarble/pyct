@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+import projector
 import sys
 import os
 import struct
@@ -7,7 +8,7 @@ import numpy
 import pylab
 import cv2
 import sys
-from math import sqrt, atan2, pi
+from math import sqrt, atan2, pi, ceil
 
 def load_rawimage(path):
     with open(path, "rb") as f:
@@ -28,9 +29,9 @@ def save_rawimage(img, outpath):
         f.write(header)
         f.write(payload)
 
-def normalize(img):
-    img -= numpy.min(img)
-    img /= numpy.max(img) - numpy.min(img)
+def normalize(img, clim):
+    img -= clim[0]
+    img /= clim[1] - clim[0]
 
 
 def show_image(img, clim=None, output_path="saved_img.dat"):
@@ -42,7 +43,7 @@ def show_image(img, clim=None, output_path="saved_img.dat"):
     if clim is None:
         clim = (numpy.min(img), numpy.max(img))
     normalized = img.copy()
-    normalize(normalized)
+    normalize(normalized, clim)
     cv2.imshow("ctpy", normalized)
     key = cv2.waitKey(0)
     if key == ord("q"):
@@ -129,3 +130,26 @@ def draw_graph(data, canvas):
         h = int(c_height - h - 1)
         canvas[h, i] = 0
     return d_mini, d_maxi
+
+def create_projection(path, interior_scale=1, detector_scale=1, sample_scale=8):
+    assert type(sample_scale) == int
+    img = load_rawimage(path)
+    NoI = img.shape[0]
+    NoA = NoI
+    NoD = int(ceil(NoI * detector_scale))
+    if NoD % 2 !=0:
+        NoD += 1
+    print (NoA, NoD)
+    overNoA = NoA# * sample_scale
+    overNoD = NoD * sample_scale
+    A = projector.Projector(NoI, overNoA, overNoD)
+    A.update_detectors_length(int(ceil(NoI*interior_scale)))
+    over_proj = zero_proj(A)
+    A.forward(img, over_proj)
+    proj = numpy.zeros((NoA, NoD))
+    for i in xrange(NoA):
+        for j in xrange(NoD):
+            for k in xrange(sample_scale):
+                proj[i, j] += over_proj[i, j*sample_scale + k]
+    proj /= sample_scale
+    return proj

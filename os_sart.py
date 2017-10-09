@@ -8,6 +8,7 @@ from projector import Projector
 #from differencial import Projector
 from math import ceil, floor
 import numpy
+import sys
 
 def diff_calc_scale(A, subsets):
     # けいさんめも｡
@@ -105,7 +106,7 @@ def os_sart(A, data, n_subset=1, n_iter=1000, recon=None, iter_callback=lambda *
 
 
 def tv_minimize(img, derivative):
-    epsilon = 1e-4
+    epsilon = 1e-2
     mu = numpy.full_like(img, epsilon**2)
     # [1:-2, 1:-2] (m, n)
     # [2:-1, 1:-2] (m+1, n)
@@ -123,11 +124,12 @@ def tv_minimize(img, derivative):
       + (img[1:-2, 1:-2] - img[2:-1, 1:-2]) / mu[2:-1, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 2:-1]) / mu[1:-2, 2:-1] \
       + (img[1:-2, 1:-2] - img[0:-3, 1:-2]) / mu[0:-3, 1:-2] + (img[1:-2, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 0:-3]
 
-def os_sart_tv(A, data, n_iter=1000, alpha=0.005, recon=None, iter_callback=lambda *x: None):
+def os_sart_tv(A, data, n_iter=1000, alpha=0.01, recon=None, iter_callback=lambda *x: None):
     if recon == None:
         recon = empty_img(A)
         recon[:, :] = 0
-    alpha_s = 0.999987
+    alpha_s = 0.99997
+    #alpha_s = 1
     n_subset = 20
     n_tv = 5
     img = empty_img(A)
@@ -162,13 +164,13 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 0.4
+    img[img < numpy.min(img) + 1] = 0
+
+    scale = 0.6
     angle_px = detector_px = width_px = img.shape[1]
     interiorA = Projector(width_px, angle_px, detector_px)
     interiorA.update_detectors_length(ceil(width_px * scale))
-    proj = empty_proj(interiorA)
-    interiorA.forward(img, proj)
-    print img[128, 128]
+    proj = create_projection(path, interior_scale=scale, sample_scale=8)
 
     # create roi mask
     roi = zero_img(interiorA)
@@ -177,12 +179,13 @@ def main():
     create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
     def callback(i, x):
-        print i ,x[128, 128], numpy.sum(numpy.sqrt(((x-img)*roi)**2))
-        if i % 10 == 0:
-            show_image(x*roi, clim=(-128, 256))
+        print i, numpy.sum(numpy.sqrt(((x-img)*roi)**2))
+        if i > 0 and i % 10 == 0:
+            save_rawimage(x, "ossarttv.dat")
 
     ### CAUTION: check if scale calculataion function is properly selected (in os_sart(_tv))###
-    os_sart_tv(interiorA, proj, n_iter=1000, iter_callback=callback) # 1497866
+    #os_sart(interiorA, proj, n_iter=1000, iter_callback=callback) # 1497866
+    os_sart_tv(interiorA, proj, n_iter=100000, iter_callback=callback) # 1497866
 
 if __name__ == '__main__':
     main()
