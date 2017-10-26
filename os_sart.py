@@ -106,7 +106,7 @@ def os_sart(A, data, n_subset=1, n_iter=1000, recon=None, iter_callback=lambda *
 
 
 def tv_minimize(img, derivative):
-    epsilon = 1e-2
+    epsilon = 8e-3
     mu = numpy.full_like(img, epsilon**2)
     # [1:-2, 1:-2] (m, n)
     # [2:-1, 1:-2] (m+1, n)
@@ -166,7 +166,7 @@ def main():
 
     img[img < numpy.min(img) + 1] = 0
 
-    scale = 0.6
+    scale = 0.4
     angle_px = detector_px = width_px = img.shape[1]
     interiorA = Projector(width_px, angle_px, detector_px)
     interiorA.update_detectors_length(ceil(width_px * scale))
@@ -179,13 +179,13 @@ def main():
     create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
     def callback(i, x):
-        print i, numpy.sum(numpy.sqrt(((x-img)*roi)**2))
+        print i, x[128, 128], numpy.sum(numpy.sqrt(((x-img)*roi)**2))
         if i > 0 and i % 10 == 0:
-            save_rawimage(x, "ossarttv.dat")
+            save_rawimage(x, "ossart/{}.dat".format(i))
 
     ### CAUTION: check if scale calculataion function is properly selected (in os_sart(_tv))###
     #os_sart(interiorA, proj, n_iter=1000, iter_callback=callback) # 1497866
-    os_sart_tv(interiorA, proj, n_iter=100000, iter_callback=callback) # 1497866
+    os_sart_tv(interiorA, proj, n_iter=10000, iter_callback=callback) # 1497866
 
 if __name__ == '__main__':
     main()
