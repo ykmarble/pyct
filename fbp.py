@@ -1,8 +1,11 @@
 #!/usr/bin/env python2
 
+import projector
+import utils
 import numpy
 import numpy.fft
 import math
+import sys
 
 def fbp(A, proj, recon):
     freq_proj = numpy.fft.fft(proj)
@@ -60,3 +63,19 @@ def ram_lak_filter(proj, sample_rate=1):
     filter[filter_width / 2] = math.pi / 2 / sample_rate ** 2
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter, proj[i])[filter_width/2:filter_width/2+NoD]
+
+def main():
+    path = sys.argv[1]
+    scale = 1
+    proj = utils.create_projection(path, interior_scale=scale)
+    A = projector.Projector(proj.shape[0], proj.shape[1], proj.shape[0])
+    A.update_detectors_length(proj.shape[0] * scale)
+    ramp_filter(proj)
+    utils.show_image(proj)
+    recon = utils.zero_img(A)
+    A.backward(proj, recon)
+    utils.show_image(recon)
+
+
+if __name__ == '__main__':
+    main()
