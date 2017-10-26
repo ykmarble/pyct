@@ -4,81 +4,10 @@ from projector import Projector
 #from differencial import Projector
 import fbp
 import utils
+from tv_denoise import tv_denoise_chambolle as tv_denoise
 import numpy
 from math import ceil, floor
 import sys
-
-def grad(img, out_x, out_y):
-    out_x[:, :] = 0
-    out_y[:, :] = 0
-    out_x[:, :-1] = img[:, 1:] - img[:, :-1]
-    out_y[:-1] = img[1:] - img[:-1]
-
-def div_2(img_x, img_y, out):
-    out[:, :] = 0
-    out[:, :-1] += img_x[:, :-1]
-    out[:, 1:] -= img_x[:, :-1]
-    out[:-1] += img_y[:-1]
-    out[1:] -= img_y[:-1]
-
-def tv_denoise(img, alpha, max_iter=10000, mask=None):
-    """
-    Smoothing a image with TV denoising method.
-    @img : 2D image array
-    @alpha : smoothness
-    @max_iter : times of iteration
-    @mask : areas where peformed denoising (0: disable, 1: enable)
-    """
-    if mask is None:
-        mask = numpy.ones_like(img)
-    # parameter
-    tol = 0.01
-    tau = 1.0 / 4  # 1 / (2 * dimension)
-
-    # matrices
-    p_x = numpy.zeros_like(img)
-    p_y = numpy.zeros_like(img)
-    div_p = numpy.zeros_like(img)
-    grad_x = numpy.empty_like(img)
-    grad_y = numpy.empty_like(img)
-    last_div_p = numpy.zeros_like(img)
-    denom = numpy.empty_like(img)
-    for i in xrange(max_iter):
-        div_2(p_x, p_y, div_p)
-        grad(div_p - img / alpha, grad_x, grad_y)
-        grad_x[:, :-1] *= mask[:, 1:]
-        grad_y[:-1] *= mask[1:]
-        denom[:] = 1
-        denom += tau * numpy.sqrt(grad_x**2 + grad_y**2)
-        p_x[mask==1] += tau * grad_x[mask==1]
-        p_x[mask==1] /= denom[mask==1]
-        p_y[mask==1] += tau * grad_y[mask==1]
-        p_y[mask==1] /= denom[mask==1]
-        if i != 0 and numpy.abs(div_p - last_div_p).max() < tol:
-            break
-        last_div_p, div_p = div_p, last_div_p
-    img[mask==1] -= div_p[mask==1] * alpha
-
-def vcoord(shape, point):
-    """
-    Convert the coordinate systems from 2D-array to the virtual system, taken as arguments.
-    @shape : a shape of 2D-array, or length of image sides
-    @point : a point in the 2D-array coordinate system
-    """
-    h, w = shape
-    x, y = point
-    return (x - w/2., h/2. - y)
-
-def acoord(shape, point):
-    """
-    Convert the coordinate systems from the virtual system to 2D-array.
-    This fuction is inverse transformation of `vcoord`.
-    @shape : a shape of 2D-array, or length of image sides
-    @point : a point in the virtual coordinate system
-    """
-    h, w = shape
-    x, y = point
-    return (x + w/2., h/2. - y)
 
 def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
               iter_callback=lambda *arg: 0, filtering=False, tv_mask=None):
@@ -133,7 +62,11 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
             #fbp.ram_lak_filter(proj, sample_rate)
             fbp.shepp_logan_filter(proj, sample_rate)
             #fbp.inv_ramp_filter(proj)
-        mu_bar = mu + sigma * proj
+        #mu_bar = mu + sigma * proj
+        mu_bar = -mu.copy()
+        mu += sigma * proj
+        mu_bar += 2 * mu
+
         A.backward_with_mask(mu_bar, img, proj_mask)
         recon -= tau * img
 
@@ -144,6 +77,8 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
 
         recon_proj -= tau * mu_bar
         recon_proj[:, interior_pad:interior_pad + interior_w] = data
+        iter_callback(i, recon, recon_proj, mu)
+
         #recon_proj[:, :interior_pad] = 0
         #recon_proj[:, interior_pad + interior_w:] = 0
         #utils.show_image(recon_proj)
@@ -152,16 +87,15 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
 
         #recon_proj[data != float("inf")] = data[data != float("inf")]
 
-        A.forward(recon, proj)
-        iter_callback(i, recon, recon_proj, mu)
-        # insert phase differential
-        proj -= recon_proj
-        if filtering:
-            #fbp.ramp_filter(proj)
-            #fbp.ram_lak_filter(proj, sample_rate)
-            fbp.shepp_logan_filter(proj, sample_rate)
-            #fbp.inv_ramp_filter(proj)
-        mu += sigma * proj
+        #A.forward(recon, proj)
+        ## insert phase differential
+        #proj -= recon_proj
+        #if filtering:
+        #    #fbp.ramp_filter(proj)
+        #    #fbp.ram_lak_filter(proj, sample_rate)
+        #    fbp.shepp_logan_filter(proj, sample_rate)
+        #    #fbp.inv_ramp_filter(proj)
+        #mu += sigma * proj
 
     return recon
 
@@ -267,7 +201,7 @@ def main():
         print "invalid file"
         sys.exit(1)
 
-    scale = 0.6
+    scale = 0.4
     angle_px = detector_px = width_px = img.shape[1]
 
     ## define metal material inner image
@@ -314,11 +248,10 @@ def main():
     def callback(i, *argv):
         x = argv[0]
         y = argv[1]
-        print i, x[0, 0], x[128, 128], numpy.sum(numpy.sqrt(((x - img)*roi)**2))
-        utils.show_image(x)
+        print i, x[128, 128], numpy.sum(numpy.sqrt(((x - img)*roi)**2))
         if i % 10 == 0:
-            utils.save_rawimage(x, "app2.dat")
-            #utils.show_image(y)
+        #    utils.save_rawimage(x, "app/{}.dat".format(i))
+             utils.show_image(x, clim=(1000-100, 1512-100))
         #utils.show_image(y)
         #for j in xrange(len(argv)):
         #    utils.show_image(argv[j])
@@ -335,7 +268,7 @@ def main():
     alpha = 0.018
     #recon = app_recon(interiorA, proj, alpha, alpha, 1000, iter_callback=callback, sample_rate=scale*1.41421356,
     #                  filtering=True, tv_mask=tvroi) # 201435.93 400 iter
-    recon = fullapp_recon(A, proj, alpha, alpha, 1000, iter_callback=callback, sample_rate=scale*1.41421356,
+    recon = fullapp_recon(A, proj, alpha, alpha, 1000, iter_callback=callback, sample_rate=1,
                           filtering=True, tv_mask=tvroi)
 
 if __name__ == '__main__':

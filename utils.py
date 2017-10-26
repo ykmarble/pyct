@@ -75,6 +75,26 @@ def reshape_to_polar(img, polar_img):
     show_image(polar_img)
     return
 
+def vcoord(shape, point):
+    """
+    Convert the coordinate systems from 2D-array to the virtual system, taken as arguments.
+    @shape : a shape of 2D-array, or length of image sides
+    @point : a point in the 2D-array coordinate system
+    """
+    h, w = shape
+    x, y = point
+    return (x - w/2., h/2. - y)
+
+def acoord(shape, point):
+    """
+    Convert the coordinate systems from the virtual system to 2D-array.
+    This fuction is inverse transformation of `vcoord`.
+    @shape : a shape of 2D-array, or length of image sides
+    @point : a point in the virtual coordinate system
+    """
+    h, w = shape
+    x, y = point
+    return (x + w/2., h/2. - y)
 
 def crop_elipse(img, center, r, value=0):
 
@@ -139,7 +159,6 @@ def create_projection(path, interior_scale=1, detector_scale=1, sample_scale=8):
     NoD = int(ceil(NoI * detector_scale))
     if NoD % 2 !=0:
         NoD += 1
-    print (NoA, NoD)
     overNoA = NoA# * sample_scale
     overNoD = NoD * sample_scale
     A = projector.Projector(NoI, overNoA, overNoD)
