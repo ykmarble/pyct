@@ -7,14 +7,14 @@ import numpy.fft
 import math
 import sys
 
-def fbp(A, proj, recon):
-    freq_proj = numpy.fft.fft(proj)
-    NoA, NoD = freq_proj.shape
-    maxfreq = NoD / 2
-    ramp = numpy.linspace(0, 1, NoD)
-    ramp[maxfreq:] = 0
-    freq_proj *= ramp[None, :]
-    A.backward(numpy.fft.ifft(freq_proj).real, recon)
+#def fbp(A, proj, recon):
+#    freq_proj = numpy.fft.fft(proj)
+#    NoA, NoD = freq_proj.shape
+#    maxfreq = NoD / 2
+#    ramp = numpy.linspace(0, 1, NoD)
+#    ramp[maxfreq:] = 0
+#    freq_proj *= ramp[None, :]
+#    A.backward(numpy.fft.ifft(freq_proj).real, recon)
 
 def cut_filter(proj, maxfreq):
     freq_proj = numpy.fft.fft(proj)
@@ -63,6 +63,19 @@ def ram_lak_filter(proj, sample_rate=1):
     filter[filter_width / 2] = math.pi / 2 / sample_rate ** 2
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter, proj[i])[filter_width/2:filter_width/2+NoD]
+
+def iterative_fbp(A, data, alpha, niter, recon=None, iter_callback=lambda *arg: 0):
+    if recon is None:
+        recon = utils.zero_img(A)
+    img = utils.zero_img(A)
+    proj = utils.zero_proj(A)
+    for i in xrange(niter):
+        A.forward(recon, proj)
+        proj -= data
+        shepp_logan_filter(proj)
+        A.backward(proj, img)
+        recon -= alpha * img
+        iter_callback(i, recon)
 
 def main():
     path = sys.argv[1]
