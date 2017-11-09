@@ -156,21 +156,12 @@ def main():
         print "Usage: {} <rawfile>"
         sys.exit(1)
     path = sys.argv[1]
-    if not os.path.exists(path):
-        print "invalid path"
-        sys.exit(1)
-    img = load_rawimage(path)
-    if img is None:
-        print "invalid file"
-        sys.exit(1)
-
-    img[img < numpy.min(img) + 1] = 0
 
     scale = 0.4
     angle_px = detector_px = width_px = img.shape[1]
     interiorA = Projector(width_px, angle_px, detector_px)
     interiorA.update_detectors_length(ceil(width_px * scale))
-    proj = create_projection(path, interior_scale=scale, sample_scale=8)
+    proj, img, interiorA = create_projection(path, interior_scale=scale, sample_scale=8)
 
     # create roi mask
     roi = zero_img(interiorA)

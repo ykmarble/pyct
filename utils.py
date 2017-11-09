@@ -171,4 +171,6 @@ def create_projection(path, interior_scale=1, detector_scale=1, sample_scale=8):
             for k in xrange(sample_scale):
                 proj[i, j] += over_proj[i, j*sample_scale + k]
     proj /= sample_scale
-    return proj
+    normalA = projector.Projector(NoI, NoA, NoD)
+    normalA.update_detectors_length(NoI * interior_scale)
+    return proj, img, normalA
