@@ -75,7 +75,7 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1
 
         tv_denoise(recon, tau / alpha, mask=tv_mask)
 
-        recon_proj -= tau * mu_bar
+        recon_proj += tau * mu_bar
         recon_proj[:, interior_pad:interior_pad + interior_w] = data
         iter_callback(i, recon, recon_proj, mu)
 
