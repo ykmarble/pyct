@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+from tv_denoise import tv_denoise_chambolle as tv_denoise
 import projector
 import utils
 import numpy
@@ -48,10 +49,15 @@ def inv_ramp_filter(proj):
 def shepp_logan_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
-    filter = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
-    filter = 1 / (math.pi * sample_rate ** 2 * (1 - 4 * filter ** 2))
+    filter_x = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
     for i in xrange(NoA):
-        proj[i] = numpy.convolve(filter, proj[i])[filter_width/2:filter_width/2+NoD]
+        th = numpy.pi * i / NoA
+        if th < numpy.pi / 4 or th > numpy.pi * 3/4:
+            sample_rate = abs(1./numpy.cos(th)) * 2
+        else:
+            sample_rate = 1./numpy.sin(th) * 2
+        filter_h = 1 / (math.pi * sample_rate ** 2 * (1 - 4 * filter_x ** 2))
+        proj[i] = numpy.convolve(filter_h, proj[i])[filter_width/2:filter_width/2+NoD]
 
 def ram_lak_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
@@ -79,15 +85,23 @@ def iterative_fbp(A, data, alpha, niter, recon=None, iter_callback=lambda *arg: 
 
 def main():
     path = sys.argv[1]
-    scale = 1
-    proj = utils.create_projection(path, interior_scale=scale)
-    A = projector.Projector(proj.shape[0], proj.shape[1], proj.shape[0])
-    A.update_detectors_length(proj.shape[0] * scale)
-    ramp_filter(proj)
-    utils.show_image(proj)
+    scale = 0.4
+    proj, orig, A = utils.create_projection(path, interior_scale=scale)
+    roi_mask = utils.zero_img(A)
+    roi_c = (roi_mask.shape[0]-1) / 2.
+    roi_r = roi_mask.shape[0] / 2. * scale
+    utils.create_elipse_mask((roi_c, roi_c), roi_r, roi_r, roi_mask)
+    #A = projector.Projector(proj.shape[0], proj.shape[1], proj.shape[0])
+    #A.update_detectors_length(proj.shape[0] * scale)
     recon = utils.zero_img(A)
-    A.backward(proj, recon)
-    utils.show_image(recon)
+    def iter_callback(i, x):
+        tv_denoise(x, 1, mask=roi_mask)
+        print i, numpy.min(x*roi_mask), numpy.max(x*roi_mask)
+        if i != 0 and i % 10 == 0:
+            utils.show_image(x*roi_mask, clim=(1000, 1255))
+    print numpy.min(orig), numpy.max(orig)
+    utils.show_image(orig, clim=(1000, 1255))
+    iterative_fbp(A, proj, 0.001, 1000, recon=recon, iter_callback=iter_callback)
 
 
 if __name__ == '__main__':

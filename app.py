@@ -9,7 +9,50 @@ import numpy
 from math import ceil, floor
 import sys
 
-def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
+def iterative_fbp(A, data, alpha, niter, recon=None, recon_proj=None, iter_callback=lambda *arg: 0, tv_mask=None):
+    if recon is None:
+        recon = utils.zero_img(A)
+    if recon_proj is None:
+        recon_proj = utils.zero_proj(A)
+
+    img = utils.zero_img(A)
+    proj = utils.zero_proj(A)
+
+    interior_w = data.shape[1]
+    interior_pad = (recon_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
+
+    # create initial projection data
+
+    #recon_proj[:, interior_pad:interior_pad + interior_w] = data
+    #
+    #recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
+    #recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
+    #recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
+    #recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
+
+    elipse_center = numpy.array(recon.shape) / 2.
+    elipse_r = numpy.array(recon.shape) / 2.1
+    elipse = img.copy()
+    #utils.create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
+    utils.create_elipse_mask(elipse_center, elipse_r[0]*1.5, elipse_r[1]*1.5, elipse) # Abd
+    elipse = elipse < 0.5
+
+    for i in xrange(niter):
+        A.forward(recon, proj)
+        proj -= recon_proj
+        fbp.shepp_logan_filter(proj)
+        A.backward(proj, img)
+        recon -= alpha * img
+        recon[elipse] = 0
+        tv_denoise(recon, alpha)
+
+        A.forward(recon, proj)
+        recon_proj -= alpha * (recon_proj - proj)
+        recon_proj[:, interior_pad:interior_pad + interior_w] = data
+        iter_callback(i, recon, recon_proj)
+
+
+def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, recon_proj=None,
               iter_callback=lambda *arg: 0, filtering=False, tv_mask=None):
     """
     Perform interior CT image reconstruction with APP method.
