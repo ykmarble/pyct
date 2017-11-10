@@ -196,6 +196,26 @@ def interpolate(n1, n2, l):
     x += n2 * numpy.sin(numpy.linspace(0, numpy.pi/2., l))**2
     return x
 
+def inpaint_metal(proj):
+    NoA, NoD = proj.shape
+    for i in xrange(NoA):
+        inf_len = 0
+        bound_number = [0, 0]  # previous ct-number, next ct-number (both are not inf)
+        for j in xrange(NoD):
+            if proj[i, j] == float("inf"):
+                if inf_len == 0 and j > 0:  # left bound of inf
+                    bound_number[0] = proj[i, j-1]
+                inf_len += 1
+            elif inf_len > 0:  # right bound of inf
+                bound_number[1] = proj[i, j]
+                #proj[i, j-inf_len:j] = numpy.linspace(bound_number[0], bound_number[1], inf_len)
+                proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
+                inf_len = 0
+        if inf_len > 0:  # inf on right proj bound
+            bound_number[1] = 0
+            #proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)
+            proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
+
 class IterLogger(object):
     def __init__(self, original_img, roi, subname=""):
         self.img = original_img

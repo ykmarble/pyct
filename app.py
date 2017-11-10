@@ -85,6 +85,9 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, recon_proj=No
 
     recon_proj[:, interior_pad:interior_pad + interior_w] = data
 
+    #recon_proj[:, :interior_pad] = 0
+    #recon_proj[:, interior_pad + interior_w:] = 0
+
     #recon_proj[:, :interior_pad] = data[:, interior_pad:0:-1]
     #recon_proj[:, interior_pad + interior_w:] = data[:, -1:-interior_pad-1:-1]
 
@@ -100,6 +103,9 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, recon_proj=No
     #A.forward(img, recon_proj)
     #recon_proj = (numpy.max(data) - numpy.min(data)) / (numpy.max(recon_proj) - numpy.min(recon_proj)) * (recon_proj - numpy.min(recon_proj)) + numpy.min(data)
 
+    recon_proj[:, :] = data[:, :]
+    utils.inpaint_metal(recon_proj)
+    utils.show_image(recon_proj)
 
     elipse_center = (numpy.array(recon.shape)-1) / 2.
     elipse_r = (numpy.array(recon.shape)-1) / 2.
@@ -109,10 +115,6 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, recon_proj=No
     alpha = 0.005
 
     recon[elipse<0.5] = -1030
-
-    #recon_proj[:, :interior_pad] = 0
-    #recon_proj[:, interior_pad + interior_w:] = 0
-
 
     utils.show_image(recon_proj)
     for i in xrange(niter):
@@ -137,10 +139,14 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, recon_proj=No
         #recon = sk_tv_denoise(recon, tau / alpha)
         #ndimage.gaussian_filter(recon, output=recon, sigma=0.5)
         tv_denoise(recon, tau / alpha, mask=tv_mask)
+
         recon_proj -= tau * mu_bar
         #recon_proj[:, interior_pad:interior_pad + interior_w] = \
         #    recon_proj[:, interior_pad:interior_pad + interior_w]*0.9 + data*0.1
         recon_proj[:, interior_pad:interior_pad + interior_w] = data
+
+        #recon_proj += tau * mu_bar
+        #recon_proj[proj_mask == 0] = data[proj_mask==0]
 
         iter_callback(i, recon, recon_proj)
 
@@ -190,6 +196,27 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
 
     return recon
 
+def mask(proj, recon_proj):
+    NoA, NoD = proj.shape
+    for i in xrange(NoA):
+        inf_len = 0
+        bound_number = [0, 0]  # previous ct-number, next ct-number (both are not inf)
+        for j in xrange(NoD):
+            if proj[i, j] == float("inf"):
+                if inf_len == 0 and j > 0:  # left bound of inf
+                    bound_number[0] = proj[i, j-1]
+                inf_len += 1
+            elif inf_len > 0:  # right bound of inf
+                bound_number[1] = proj[i, j]
+                recon_proj[i, j-inf_len:j] = numpy.linspace(bound_number[0], bound_number[1], inf_len) \
+                                             * numpy.abs(numpy.cos(numpy.linspace(0, numpy.pi, inf_len)))
+                #proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
+                inf_len = 0
+        if inf_len > 0:  # inf on right proj bound
+            bound_number[1] = 0
+            recon_proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)  \
+                                       * numpy.cos(numpy.linspace(0, numpy.pi, inf_len))
+            #proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
 
 def main():
     import os.path
@@ -201,32 +228,62 @@ def main():
         print "invalid path"
         sys.exit(1)
 
-    scale = 0.85
+    ##### begin: interior projection ######
+    #scale = 0.85
+    ## interior projection
+    #proj, img, interiorA = utils.create_projection(path, interior_scale=scale)
+    #
+    ## global projection
+    #full_proj, img, A = utils.create_projection(path, detector_scale=(1/scale)*1.5, angular_scale=1.5)
+    #
+    ## truncate global projection
+    #interior_w = int(img.shape[0]*1.5)
+    #interior_pad = (full_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
+    #proj = full_proj[:, interior_pad:interior_pad + interior_w]
+    #truncate = (numpy.sin(numpy.linspace(-numpy.pi/2., numpy.pi/2., interior_pad/2))+1)/2.
+    #
+    ## create roi mask
+    #roi = utils.zero_img(interiorA)
+    #roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
+    #roi_r = [roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.]
+    #utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
+    ##### end: interior projection ######
 
-    # interior projection
-    proj, img, interiorA = utils.create_projection(path, interior_scale=scale)
+    ##### begin: metal projection #####
+    proj, img, A = utils.create_projection(path, detector_scale=1.5, angular_scale=1.5)
 
-    # global projection
-    full_proj, img, A = utils.create_projection(path, detector_scale=(1/scale)*1.5, angular_scale=1.5)
+    # define metal material inner image
+    metal_mask = numpy.zeros_like(img, dtype=numpy.int)
+    mask_c = (-50 + (metal_mask.shape[0] - 1) / 2.0, -10 + (metal_mask.shape[1] - 1) / 2.0)
+    utils.create_elipse_mask(mask_c, 10, 10, metal_mask, 1)
+    img[metal_mask==1] = float("inf")
 
-    # truncate global projection
-    interior_w = int(img.shape[0]*1.5)
-    interior_pad = (full_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
-    proj = full_proj[:, interior_pad:interior_pad + interior_w]
-    truncate = (numpy.sin(numpy.linspace(-numpy.pi/2., numpy.pi/2., interior_pad/2))+1)/2.
+    #mask_c = (-80 + (metal_mask.shape[0] - 1) / 2.0, 30 + (metal_mask.shape[1] - 1) / 2.0)
+    #utils.create_elipse_mask(mask_c, 3, 2, metal_mask, 1)
+    #img[metal_mask==1] = float("inf")
+
+    ## get metal mask of projection domain
+    proj_mask = numpy.zeros_like(proj, dtype=numpy.int)
+    tmp_proj = numpy.zeros_like(proj)
+    A.forward(img, tmp_proj)
+    proj_mask[tmp_proj==float("inf")] = 1
+    recon_proj = proj.copy()
+    proj[proj_mask==1] = float("inf")
+    #mask(proj, recon_proj)
 
     # create roi mask
-    roi = utils.zero_img(interiorA)
+    roi = utils.zero_img(A)
     roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
-    roi_r = [roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.]
+    roi_r = [roi.shape[0] / 2., roi.shape[1] / 2.]
     utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
+    ##### end: metal projection #####
 
     # setup callback routine
     (_, name, _) = utils.decompose_path(path)
     #callback = lambda *x: None
     #callback = utils.IterViewer(img, roi, clim=(-110, 190))
     #callback = utils.IterViewer(img, roi, clim=(-1053, 1053))
-    callback = utils.IterLogger(img, roi, subname="noise_app_oipri_"+name)
+    callback = utils.IterLogger(img, roi, subname="noise_app_oepri_"+name)
 
     # without filter
     #alpha = 0.004
