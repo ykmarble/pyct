@@ -5,7 +5,9 @@ from projector import Projector
 import fbp
 import utils
 from tv_denoise import tv_denoise_chambolle as tv_denoise
+from skimage.restoration import denoise_tv_chambolle as sk_tv_denoise
 import numpy
+from scipy import ndimage
 from math import ceil, floor
 import sys
 
@@ -31,7 +33,7 @@ def iterative_fbp(A, data, alpha, niter, recon=None, recon_proj=None, iter_callb
     #recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
 
     elipse_center = numpy.array(recon.shape) / 2.
-    elipse_r = numpy.array(recon.shape) / 2.1
+    elipse_r = numpy.array(recon.shape) / 2.
     elipse = img.copy()
     #utils.create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
     utils.create_elipse_mask(elipse_center, elipse_r[0]*1.5, elipse_r[1]*1.5, elipse) # Abd
@@ -83,37 +85,49 @@ def fullapp_recon(A, data, sigma, tau, niter, recon=None, mu=None, recon_proj=No
     # create initial projection data
 
     recon_proj[:, interior_pad:interior_pad + interior_w] = data
+    recon_proj[:, :interior_pad] = data[:, interior_pad:0:-1]
+    recon_proj[:, interior_pad + interior_w:] = data[:, -1:-interior_pad-1:-1]
 
-    recon_proj[:, :interior_pad] = (data[:, 0])[:, None]
-    recon_proj[:, interior_pad + interior_w:] = (data[:, -1])[:, None]
-    recon_proj[:, :interior_pad] *= (numpy.linspace(0, 1, interior_pad))[None, :]
-    recon_proj[:, interior_pad + interior_w:] *= (numpy.linspace(1, 0, interior_pad))[None, :]
+    #for i in xrange(recon_proj.shape[0]):
+        #recon_proj[i, :interior_pad] = utils.interpolate(0, data[i, 0], interior_pad)
+        #recon_proj[i, interior_pad + interior_w:] = utils.interpolate(data[i, -1], 0, interior_pad)
 
-    elipse_center = numpy.array(recon.shape) / 2.
-    elipse_r = numpy.array(recon.shape) / 2.1
+    fbp.shepp_logan_filter(recon_proj)
+    A.backward(recon_proj, img)
+    A.forward(img, recon_proj)
+    recon_proj = (numpy.max(data) - numpy.min(data)) / (numpy.max(recon_proj) - numpy.min(recon_proj)) * (recon_proj - numpy.min(recon_proj)) + numpy.min(data)
+
+    utils.show_image(recon_proj)
+
+    elipse_center = (numpy.array(recon.shape)-1) / 2.
+    elipse_r = (numpy.array(recon.shape)-1) / 2.
     elipse = img.copy()
     #utils.create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
-    utils.create_elipse_mask(elipse_center, elipse_r[0]*1.5, elipse_r[1]*1.5, elipse) # Abd
-    elipse = elipse < 0.5
-    alpha = 0.004
+    utils.create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse) # Abd
+    alpha = 0.005
+
+    recon[elipse<0.5] = -1053
 
     for i in xrange(niter):
         A.forward(recon, proj)
         proj -= recon_proj
         if filtering:
-            fbp.shepp_logan_filter(proj, sample_rate=1.41421356)
+            fbp.shepp_logan_filter(proj, sample_rate=2.5)
         mu_bar = -mu.copy()
         mu += sigma * proj
         mu_bar += 2 * mu
 
         A.backward(mu_bar, img)
         recon -= tau * img
-        recon[elipse] = 0
-        tv_denoise(recon, tau / alpha, mask=tv_mask)
-
+        #recon[elipse] = 0
+        #recon = sk_tv_denoise(recon, tau / alpha)
+        ndimage.gaussian_filter(recon, output=recon, sigma=0.3)
+        tv_denoise(recon, tau / alpha)
         recon_proj += tau * mu_bar
-        recon_proj[:, interior_pad:interior_pad + interior_w] = data
-        iter_callback(i, recon, recon_proj, mu)
+        recon_proj[:, interior_pad:interior_pad + interior_w] = \
+            recon_proj[:, interior_pad:interior_pad + interior_w]*0.9 + data*0.1
+        #recon_proj[:, interior_pad:interior_pad + interior_w] = data
+        iter_callback(i, recon, recon_proj)
 
     return recon
 
@@ -149,22 +163,20 @@ def app_recon(A, data, sigma, tau, niter, recon=None, mu=None, sample_rate=1,
         A.forward(recon, proj)
         proj -= data
         if filtering:
-            fbp.shepp_logan_filter(proj, sample_rate)
+            fbp.shepp_logan_filter(proj, 2.5)
         mu_bar = -mu.copy()
         mu += sigma * proj
         mu_bar += 2 * mu
         A.backward(mu_bar, img)
         recon -= tau * img
-        recon[elipse] = 0
+        #recon[elipse] = 0
         tv_denoise(recon, tau / alpha, mask=tv_mask)
-
-        iter_callback(i, recon, mu)
+        iter_callback(i, recon, proj)
 
     return recon
 
 
 def main():
-    import sys
     import os.path
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -174,7 +186,7 @@ def main():
         print "invalid path"
         sys.exit(1)
 
-    scale = 0.4
+    scale = 0.8
 
     # interior projection
     proj, img, interiorA = utils.create_projection(path, interior_scale=scale)
@@ -194,25 +206,27 @@ def main():
     roi_r = [roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.]
     utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
-    def callback(i, *argv):
-        x = argv[0]
-        y = argv[1]
-        print i, numpy.min(x), numpy.max(x)
-        if i != 0 and i % 10 == 0:
-             #utils.save_rawimage(x, "app/{}.dat".format(i))
-             utils.show_image(x, clim=(1000-100, 1512-100))
+    # setup callback routine
+    (_, name, _) = utils.decompose_path(path)
+    callback = utils.IterViewer(img, roi, clim=(-110, 190))
+    #callback = utils.IterViewer(img, roi, clim=(-1053, 1053))
+    #callback = utils.IterLogger(img, roi, subname="fapp_moving"+name)
 
     # without filter
     #alpha = 0.004
-    #alpha = 0.001
-    #recon = app_recon(interiorA, proj, alpha, alpha,1000, iter_callback=callback) # 1635498
+    #alpha = 0.004
+    #recon = app_recon(interiorA, proj, alpha, alpha,1000, iter_callback=callback)
 
     # with filter
     #alpha = 0.0465
-    alpha = 0.018
-    #recon = app_recon(interiorA, proj, alpha, alpha, 1000, iter_callback=callback
-    #                  filtering=True, tv_mask=roi) # 201435.93 400 iter
-    recon = fullapp_recon(A, proj, alpha, alpha, 1000, iter_callback=callback, filtering=True)
+    #alpha = 0.018
+
+    alpha = 0.002
+    alpha = 0.15
+    #recon = app_recon(interiorA, proj, alpha, alpha, 500, iter_callback=callback,
+    #                  tv_mask=roi, filtering=True) # 201435.93 400 iter
+    recon = fullapp_recon(A, proj, alpha*2, alpha, 500, iter_callback=callback,
+                          tv_mask=roi, filtering=True)
 
 if __name__ == '__main__':
     main()

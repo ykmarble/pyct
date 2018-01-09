@@ -15,7 +15,7 @@ def div_2(img_x, img_y, out):
     out[:-1] += img_y[:-1]
     out[1:] -= img_y[:-1]
 
-def tv_denoise_chambolle(img, alpha, max_iter=10000, mask=None):
+def tv_denoise_chambolle(img, alpha, max_iter=200, mask=None):
     """
     Smoothing a image with TV denoising method.
     @img : 2D image array

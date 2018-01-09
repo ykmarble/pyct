@@ -8,15 +8,6 @@ import numpy.fft
 import math
 import sys
 
-#def fbp(A, proj, recon):
-#    freq_proj = numpy.fft.fft(proj)
-#    NoA, NoD = freq_proj.shape
-#    maxfreq = NoD / 2
-#    ramp = numpy.linspace(0, 1, NoD)
-#    ramp[maxfreq:] = 0
-#    freq_proj *= ramp[None, :]
-#    A.backward(numpy.fft.ifft(freq_proj).real, recon)
-
 def cut_filter(proj, maxfreq):
     freq_proj = numpy.fft.fft(proj)
     NoA, NoD = freq_proj.shape
@@ -51,11 +42,11 @@ def shepp_logan_filter(proj, sample_rate=1):
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
     filter_x = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
     for i in xrange(NoA):
-        th = numpy.pi * i / NoA
-        if th < numpy.pi / 4 or th > numpy.pi * 3/4:
-            sample_rate = abs(1./numpy.cos(th)) * 2
-        else:
-            sample_rate = 1./numpy.sin(th) * 2
+        #th = numpy.pi * i / NoA
+        #if th < numpy.pi / 4 or th > numpy.pi * 3/4:
+        #    sample_rate = abs(1./numpy.cos(th)) * 2
+        #else:
+        #    sample_rate = 1./numpy.sin(th) * 2
         filter_h = 1 / (math.pi * sample_rate ** 2 * (1 - 4 * filter_x ** 2))
         proj[i] = numpy.convolve(filter_h, proj[i])[filter_width/2:filter_width/2+NoD]
 
@@ -69,6 +60,11 @@ def ram_lak_filter(proj, sample_rate=1):
     filter[filter_width / 2] = math.pi / 2 / sample_rate ** 2
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter, proj[i])[filter_width/2:filter_width/2+NoD]
+
+def fbp(A, data, recon):
+    shepp_logan_filter(data, sample_rate=1.41421356)
+    A.backward(data, recon)
+
 
 def iterative_fbp(A, data, alpha, niter, recon=None, iter_callback=lambda *arg: 0):
     if recon is None:
@@ -85,7 +81,7 @@ def iterative_fbp(A, data, alpha, niter, recon=None, iter_callback=lambda *arg: 
 
 def main():
     path = sys.argv[1]
-    scale = 0.4
+    scale = 0.8
     proj, orig, A = utils.create_projection(path, interior_scale=scale)
     roi_mask = utils.zero_img(A)
     roi_c = (roi_mask.shape[0]-1) / 2.
@@ -94,6 +90,13 @@ def main():
     #A = projector.Projector(proj.shape[0], proj.shape[1], proj.shape[0])
     #A.update_detectors_length(proj.shape[0] * scale)
     recon = utils.zero_img(A)
+    utils.show_image(proj)
+    fbp(A, proj, recon)
+    recon /= 100
+    recon *= 1.5
+    print numpy.min(recon), numpy.max(recon)
+    utils.show_image(recon)
+    return
     def iter_callback(i, x):
         tv_denoise(x, 1, mask=roi_mask)
         print i, numpy.min(x*roi_mask), numpy.max(x*roi_mask)

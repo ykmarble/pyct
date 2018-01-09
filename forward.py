@@ -20,7 +20,7 @@ def main():
     A = projector.Projector(NoI, NoA, NoD)
     A.forward(img, proj)
     utils.show_image(proj)
-    utils.save_rawimage(proj, "proj.dat")
+    #utils.save_rawimage(proj, "proj.dat")
 
 if __name__ == "__main__":
     main()

@@ -5,10 +5,19 @@ import sys
 import os
 import struct
 import numpy
-import pylab
 import cv2
-import sys
+import time
 from math import sqrt, atan2, pi, ceil
+
+def decompose_path(path):
+    dname = os.path.dirname(path)
+    bname = os.path.basename(path).rsplit(".", 1)
+    fname = bname[0]
+    if len(bname) > 1:
+        ext = bname[1]
+    else:
+        ext = ""
+    return dname, fname, ext
 
 def load_rawimage(path):
     with open(path, "rb") as f:
@@ -19,6 +28,11 @@ def load_rawimage(path):
         height = header[3]
         img = numpy.array(struct.unpack("{}f".format(width*height), f.read()))
     img.resize(height, width)
+    NoI = img.shape[0]
+    r =(NoI-1)/2.
+    mask = numpy.zeros_like(img)
+    create_elipse_mask((r, r), r, r, mask)
+    img[mask!=1] = 0
     return img
 
 def save_rawimage(img, outpath):
@@ -34,7 +48,7 @@ def normalize(img, clim):
     img /= clim[1] - clim[0]
 
 
-def show_image(img, clim=None, output_path="saved_img.dat"):
+def show_image(img, clim=None, output_path="saved_img.dat", caption="ctpy"):
     """
     @img: 2d or 3d numpy array
     @clim: tuple contains pair of color bound, or None which means deriving them from array
@@ -44,14 +58,14 @@ def show_image(img, clim=None, output_path="saved_img.dat"):
         clim = (numpy.min(img), numpy.max(img))
     normalized = img.copy()
     normalize(normalized, clim)
-    cv2.imshow("ctpy", normalized)
+    cv2.imshow(caption, normalized)
     key = cv2.waitKey(0)
     if key == ord("q"):
         sys.exit()
     elif key == ord("s"):
         save_rawimage(img, "saved_img.dat")
         print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
-    return key
+    return chr(key)
 
 def reshape_to_polar(img, polar_img):
     Nth, Nr = img.shape
@@ -174,3 +188,59 @@ def create_projection(path, interior_scale=1, detector_scale=1, sample_scale=8):
     normalA = projector.Projector(NoI, NoA, NoD)
     normalA.update_detectors_length(NoI * interior_scale)
     return proj, img, normalA
+
+def interpolate(n1, n2, l):
+    x = numpy.zeros(l)
+    x += n1 * numpy.cos(numpy.linspace(0, numpy.pi/2., l))**2
+    x += n2 * numpy.sin(numpy.linspace(0, numpy.pi/2., l))**2
+    return x
+
+class IterLogger(object):
+    def __init__(self, original_img, roi, subname=""):
+        self.img = original_img
+        self.roi = roi
+
+        # generate the output directory path and create its directory
+        timestamp = str(int(time.time()))
+        (_, method, _) = decompose_path(sys.argv[0])
+
+        self.dirpath = os.path.join(os.getcwd(), "iterout", method, timestamp+subname)
+        print "output dir: {}".format(self.dirpath)
+        self._mkdir(self.dirpath)
+
+        # log file
+        logname = "iterlog.txt"
+        self.log_handler = open(os.path.join(self.dirpath, logname), "w")
+
+    def __call__(self, i, x, y):
+        rmse = self._rmse(x)
+        print i+1, rmse
+        self.log_handler.write("{} {}\n".format(i+1, rmse))
+        self.log_handler.flush()
+
+        if (i+1) % 10 == 0:
+            imgname = "{}.dat".format(i+1)
+            save_rawimage(x, os.path.join(self.dirpath, imgname))
+
+    def _mkdir(self, path):
+        if os.path.isdir(path):
+            return
+        if os.path.exists(path):
+            raise Exception("{} is already used as a file.".format(path))
+        os.makedirs(path)
+
+    def _rmse(self, x):
+        N = x.shape[0] * x.shape[1]
+        return numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / N)
+
+
+class IterViewer(object):
+    def __init__(self, original_img, roi, clim=None):
+        self.img = original_img
+        self.roi = roi
+        self.clim = clim
+        self.N = self.img.shape[0] * self.img.shape[0]
+
+    def __call__(self, i, x, y):
+        print i, numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / self.N)
+        show_image(x, clim=self.clim)

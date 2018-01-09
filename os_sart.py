@@ -102,7 +102,7 @@ def os_sart(A, data, n_subset=1, n_iter=1000, recon=None, iter_callback=lambda *
 
     for i in xrange(n_iter):
         os_sart_mainloop(A, data, recon, a_ip, a_pj_subset, subsets, i, img, proj)
-        iter_callback(i, recon)
+        iter_callback(i, recon, proj)
 
 
 def tv_minimize(img, derivative):
@@ -147,7 +147,7 @@ def os_sart_tv(A, data, n_iter=1000, alpha=0.01, recon=None, iter_callback=lambd
                 beta = numpy.max(recon)/numpy.max(d)
                 recon -= alpha * beta * d
                 alpha *= alpha_s
-        iter_callback(i, recon)
+        iter_callback(i, recon, proj)
 
 def main():
     import sys
@@ -157,11 +157,8 @@ def main():
         sys.exit(1)
     path = sys.argv[1]
 
-    scale = 0.4
-    angle_px = detector_px = width_px = img.shape[1]
-    interiorA = Projector(width_px, angle_px, detector_px)
-    interiorA.update_detectors_length(ceil(width_px * scale))
-    proj, img, interiorA = create_projection(path, interior_scale=scale, sample_scale=8)
+    scale = 0.8
+    proj, img, interiorA = create_projection(path, interior_scale=scale)
 
     # create roi mask
     roi = zero_img(interiorA)
@@ -169,14 +166,13 @@ def main():
     roi_r = (roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.)
     create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
-    def callback(i, x):
-        print i, x[128, 128], numpy.sum(numpy.sqrt(((x-img)*roi)**2))
-        if i > 0 and i % 10 == 0:
-            save_rawimage(x, "ossart/{}.dat".format(i))
+    (_, name, _) = decompose_path(path)
+    #callback = IterViewer(img, roi, clim=(-110, 190))
+    callback = IterLogger(img, roi, subname=name)
 
     ### CAUTION: check if scale calculataion function is properly selected (in os_sart(_tv))###
     #os_sart(interiorA, proj, n_iter=1000, iter_callback=callback) # 1497866
-    os_sart_tv(interiorA, proj, n_iter=10000, iter_callback=callback) # 1497866
+    os_sart_tv(interiorA, proj, n_iter=500, iter_callback=callback) # 1497866
 
 if __name__ == '__main__':
     main()
