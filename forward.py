@@ -10,6 +10,24 @@ def main():
         print "Usage: {} <rawfile>".format(sys.argv[0])
         return
     path = sys.argv[1]
+
+    #proj = utils.load_rawimage(path)
+    #NoA, NoD = proj.shape
+    #NoA, NoD = (256, 256)
+    #NoI = NoA
+    #A = projector.Projector(NoI, NoA, NoD)
+    #img = numpy.empty((NoI, NoI))
+    #import fbp
+    #proj = proj[:, 23:256+23]
+    #fbp.shepp_logan_filter(proj)
+    #print proj.shape
+    #utils.show_image(proj)
+    #A.backward(proj, img)
+    #print numpy.min(img), numpy.max(img)
+    #print proj.shape
+    #utils.show_image(img, clim=(-20, 20))
+    #return
+
     img = utils.load_rawimage(path)
     if img is None:
         print "Invalid file."

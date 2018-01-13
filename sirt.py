@@ -6,7 +6,7 @@ import projector
 import sys
 from numpy import ceil
 
-def sirt(A, data, niter=1000, recon=None, iter_callback=lambda *x : None):
+def sirt(A, data, niter=500, recon=None, iter_callback=lambda *x : None):
     if recon == None:
         recon = utils.empty_img(A)
         recon[:, :] = 0
@@ -32,7 +32,7 @@ def main():
     if img is None:
         print "Invalid file."
         return
-    scale = 0.8
+    scale = 0.75
     NoI = img.shape[0]
     NoD = NoA = NoI
     proj = numpy.empty((NoA, NoD))

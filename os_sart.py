@@ -157,7 +157,7 @@ def main():
         sys.exit(1)
     path = sys.argv[1]
 
-    scale = 0.8
+    scale = 0.85
     proj, img, interiorA = create_projection(path, interior_scale=scale)
 
     # create roi mask

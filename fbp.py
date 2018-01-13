@@ -7,6 +7,7 @@ import numpy
 import numpy.fft
 import math
 import sys
+import matplotlib.pyplot as pp
 
 def cut_filter(proj, maxfreq):
     freq_proj = numpy.fft.fft(proj)
@@ -41,14 +42,20 @@ def shepp_logan_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
     filter_x = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
+    filter_h = 1 / ((math.pi * sample_rate) ** 2 * (1 - 4 * filter_x ** 2))
+    proj3 = numpy.concatenate((proj[:, -NoD/2-1::-1], proj, proj[:, :NoD/2-1:-1]), axis=1)
+    proj3 = numpy.empty((NoA, NoD*2))
+    proj3[:, :NoD/2] = proj[:, 0, None]
+    proj3[:, NoD/2:NoD/2+NoD] = proj
+    proj3[:, NoD/2+NoD:] = proj[:, -1, None]
     for i in xrange(NoA):
         #th = numpy.pi * i / NoA
         #if th < numpy.pi / 4 or th > numpy.pi * 3/4:
         #    sample_rate = abs(1./numpy.cos(th)) * 2
         #else:
         #    sample_rate = 1./numpy.sin(th) * 2
-        filter_h = 1 / (math.pi * sample_rate ** 2 * (1 - 4 * filter_x ** 2))
-        proj[i] = numpy.convolve(filter_h, proj[i])[filter_width/2:filter_width/2+NoD]
+        #filter_h = 1 / (math.pi * sample_rate ** 2 * (1 - 4 * filter_x ** 2))
+        proj[i] = numpy.convolve(filter_h, proj3[i], "valid")
 
 def ram_lak_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape

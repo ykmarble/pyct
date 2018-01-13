@@ -28,11 +28,12 @@ def load_rawimage(path):
         height = header[3]
         img = numpy.array(struct.unpack("{}f".format(width*height), f.read()))
     img.resize(height, width)
-    NoI = img.shape[0]
-    r =(NoI-1)/2.
-    mask = numpy.zeros_like(img)
-    create_elipse_mask((r, r), r, r, mask)
-    img[mask!=1] = 0
+    #NoI = img.shape[0]
+    #r =(NoI-1)/2.
+    #mask = numpy.zeros_like(img)
+    #create_elipse_mask((r, r), r-2, r-2, mask)
+    #img[mask!=1] = img[1, NoI/2]
+    #img -= numpy.min(img)
     return img
 
 def save_rawimage(img, outpath):
@@ -165,11 +166,11 @@ def draw_graph(data, canvas):
         canvas[h, i] = 0
     return d_mini, d_maxi
 
-def create_projection(path, interior_scale=1, detector_scale=1, sample_scale=8):
+def create_projection(path, interior_scale=1, angular_scale=1, detector_scale=1, sample_scale=8):
     assert type(sample_scale) == int
     img = load_rawimage(path)
     NoI = img.shape[0]
-    NoA = NoI
+    NoA = int(ceil(NoI * angular_scale))
     NoD = int(ceil(NoI * detector_scale))
     if NoD % 2 !=0:
         NoD += 1
