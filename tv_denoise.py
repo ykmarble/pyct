@@ -26,7 +26,7 @@ def tv_denoise_chambolle(img, alpha, max_iter=200, mask=None):
     if mask is None:
         mask = numpy.ones_like(img)
     # parameter
-    tol = 0.01
+    tol = 0.005
     tau = 1.0 / 4  # 1 / (2 * dimension)
 
     # matrices

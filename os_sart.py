@@ -128,7 +128,8 @@ def os_sart_tv(A, data, n_iter=1000, alpha=0.01, recon=None, iter_callback=lambd
     if recon == None:
         recon = empty_img(A)
         recon[:, :] = 0
-    alpha_s = 0.99997
+    #alpha_s = 0.99997
+    alpha_s = 0.997
     #alpha_s = 1
     n_subset = 20
     n_tv = 5
@@ -157,8 +158,8 @@ def main():
         sys.exit(1)
     path = sys.argv[1]
 
-    scale = 0.85
-    proj, img, interiorA = create_projection(path, interior_scale=scale)
+    scale = 0.8
+    proj, img, interiorA = create_projection(path, interior_scale=scale, detector_scale=1.5, angular_scale=1.5)
 
     # create roi mask
     roi = zero_img(interiorA)

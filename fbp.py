@@ -44,10 +44,10 @@ def shepp_logan_filter(proj, sample_rate=1):
     filter_x = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
     filter_h = 1 / ((math.pi * sample_rate) ** 2 * (1 - 4 * filter_x ** 2))
     proj3 = numpy.concatenate((proj[:, -NoD/2-1::-1], proj, proj[:, :NoD/2-1:-1]), axis=1)
-    proj3 = numpy.empty((NoA, NoD*2))
-    proj3[:, :NoD/2] = proj[:, 0, None]
-    proj3[:, NoD/2:NoD/2+NoD] = proj
-    proj3[:, NoD/2+NoD:] = proj[:, -1, None]
+    #proj3 = numpy.empty((NoA, NoD*2))
+    #proj3[:, :NoD/2] = proj[:, 0, None]
+    #proj3[:, NoD/2:NoD/2+NoD] = proj
+    #proj3[:, NoD/2+NoD:] = proj[:, -1, None]
     for i in xrange(NoA):
         #th = numpy.pi * i / NoA
         #if th < numpy.pi / 4 or th > numpy.pi * 3/4:
@@ -89,7 +89,7 @@ def iterative_fbp(A, data, alpha, niter, recon=None, iter_callback=lambda *arg: 
 def main():
     path = sys.argv[1]
     scale = 0.8
-    proj, orig, A = utils.create_projection(path, interior_scale=scale)
+    proj, orig, A = utils.create_projection(path, interior_scale=scale, detector_scale=1.5, angular_scale=1.5)
     roi_mask = utils.zero_img(A)
     roi_c = (roi_mask.shape[0]-1) / 2.
     roi_r = roi_mask.shape[0] / 2. * scale
@@ -100,9 +100,10 @@ def main():
     utils.show_image(proj)
     fbp(A, proj, recon)
     recon /= 100
-    recon *= 1.5
+    recon *= 3
     print numpy.min(recon), numpy.max(recon)
-    utils.show_image(recon)
+    utils.show_image(orig*roi_mask, clim=(-110, 190))
+    utils.show_image(recon, clim=(-110, 190))
     return
     def iter_callback(i, x):
         tv_denoise(x, 1, mask=roi_mask)

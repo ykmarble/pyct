@@ -12,7 +12,7 @@ def sirt(A, data, niter=500, recon=None, iter_callback=lambda *x : None):
         recon[:, :] = 0
     img = utils.empty_img(A)
     proj = utils.empty_proj(A)
-    alpha = 0.000008
+    alpha = 1./(A.NoI * A.NoA)
 
     for i in xrange(niter):
         A.forward(recon, proj)
@@ -28,28 +28,27 @@ def main():
         print "Usage: {} <rawfile>".format(sys.argv[0])
         return
     path = sys.argv[1]
-    img = utils.load_rawimage(path)
+
+    scale = 0.8
+
+    proj, img, A = utils.create_projection(path, interior_scale=scale, detector_scale=1.5, angular_scale=1.5)
+
     if img is None:
         print "Invalid file."
         return
-    scale = 0.75
-    NoI = img.shape[0]
-    NoD = NoA = NoI
-    proj = numpy.empty((NoA, NoD))
-    A = projector.Projector(NoI, NoA, NoD)
-    A.update_detectors_length(NoI * scale)
-    A.forward(img, proj)
 
     roi = utils.zero_img(A)
     roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
     roi_r = [roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.]
     utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
+    utils.show_image(img*roi, clim=(-110, 190))
     (_, name, _) = utils.decompose_path(path)
     callback = utils.IterViewer(img, roi, clim=(-110, 190))
     #callback = utils.IterLogger(img, roi, subname=name)
+    print proj.shape
+    return
 
-    utils.show_image(img*roi, clim=(-110, 190))
     sirt(A, proj, iter_callback=callback)
 
 if __name__ == "__main__":
