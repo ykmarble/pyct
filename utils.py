@@ -167,8 +167,11 @@ def draw_graph(data, canvas):
     return d_mini, d_maxi
 
 def create_projection(path, interior_scale=1, angular_scale=1, detector_scale=1, sample_scale=8):
+    hu_lim = [-1050., 1500.]
     assert type(sample_scale) == int
     img = load_rawimage(path)
+    #img -= hu_lim[0]
+    #img /= hu_lim[1] - hu_lim[0]
     NoI = img.shape[0]
     NoA = int(ceil(NoI * angular_scale))
     NoD = int(ceil(NoI * detector_scale))
@@ -216,6 +219,35 @@ def inpaint_metal(proj):
             #proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)
             proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
 
+def normalizedHU(hu):
+    hu_lim = [-1050., 1500.]
+    hu -= hu_lim[0]
+    hu /= hu_lim[1] - hu_lim[0]
+    return hu
+
+def mask(proj, recon_proj):
+    NoA, NoD = proj.shape
+    for i in xrange(NoA):
+        inf_len = 0
+        bound_number = [0, 0]  # previous ct-number, next ct-number (both are not inf)
+        for j in xrange(NoD):
+            if proj[i, j] == float("inf"):
+                if inf_len == 0 and j > 0:  # left bound of inf
+                    bound_number[0] = proj[i, j-1]
+                inf_len += 1
+            elif inf_len > 0:  # right bound of inf
+                bound_number[1] = proj[i, j]
+                recon_proj[i, j-inf_len:j] = numpy.linspace(bound_number[0], bound_number[1], inf_len) \
+                                             * numpy.abs(numpy.cos(numpy.linspace(0, numpy.pi, inf_len)))
+                #proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
+                inf_len = 0
+        if inf_len > 0:  # inf on right proj bound
+            bound_number[1] = 0
+            recon_proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)  \
+                                       * numpy.cos(numpy.linspace(0, numpy.pi, inf_len))
+            #proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
+
+
 class IterLogger(object):
     def __init__(self, original_img, roi, subname=""):
         self.img = original_img
@@ -256,12 +288,15 @@ class IterLogger(object):
 
 
 class IterViewer(object):
-    def __init__(self, original_img, roi, clim=None):
+    def __init__(self, original_img, roi, clim=None, niter=10):
         self.img = original_img
         self.roi = roi
         self.clim = clim
         self.N = self.img.shape[0] * self.img.shape[0]
+        self.niter = niter
 
     def __call__(self, i, x, y):
-        print i, numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / self.N)
-        show_image(x, clim=self.clim)
+        hu_lim = [-1050., 1500.]
+        print i+1, numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / self.N)
+        if (i+1) % self.niter == 0:
+            show_image(x, clim=self.clim)

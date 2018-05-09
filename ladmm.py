@@ -4,10 +4,10 @@ import utils
 from worker import main
 
 
-def app(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y: y,
-        x=None, y=None, mu=None, iter_callback=lambda *arg: 0):
+def ladmm(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y: y,
+          x=None, y=None, mu=None, iter_callback=lambda *arg: 0):
     """
-    Perform interior CT image reconstruction with APP method.
+    Perform interior CT image reconstruction with Linearized ADMM method.
     @A : system matrix class
     @alpha : step size parameter
     @beta : step sizeparameter
@@ -22,31 +22,34 @@ def app(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y:
     """
     if x is None:
         x = utils.zero_img(A)
-    if y is None:
-        y = utils.zero_proj(A)
     if mu is None:
         mu = utils.zero_proj(A)
+    if y is None:
+        y = utils.zero_proj(A)
+
     img = utils.zero_img(A)
-    proj = utils.zero_proj(A)
+    proj_k1 = utils.zero_proj(A)
+    proj_k = utils.zero_proj(A)
 
     for i in xrange(niter):
-        A.forward(x, proj)
-        proj -= y
-        G(proj)
-        mu_bar = -mu.copy()
-        mu += alpha * proj
-        mu_bar += 2 * mu
-
-        A.backward(mu_bar, img)
-        x -= beta * img
+        proj_k -= y
+        proj_k += mu
+        G(proj_k)
+        A.backward(proj_k, img)
+        x -= alpha / beta * img
         phi_x(x)
 
-        y += beta * mu_bar
+        A.forward(x, proj_k1)
+        y = proj_k1 + mu
         phi_y(y)
 
-        iter_callback(i, x, y, mu)
+        mu += proj_k1 - y
+        proj_k[:] = proj_k1[:]
+
+        iter_callback(i, x, y)
 
     return x
 
+
 if __name__ == '__main__':
-    main(app)
+    main(ladmm)

@@ -9,10 +9,10 @@ from numpy import ceil
 def sirt(A, data, niter=500, recon=None, iter_callback=lambda *x : None):
     if recon == None:
         recon = utils.empty_img(A)
-        recon[:, :] = 0
+        recon[:, :] = 0.5
     img = utils.empty_img(A)
     proj = utils.empty_proj(A)
-    alpha = 1./(A.NoI * A.NoA)
+    alpha = 10000
 
     for i in xrange(niter):
         A.forward(recon, proj)
@@ -29,7 +29,7 @@ def main():
         return
     path = sys.argv[1]
 
-    scale = 0.8
+    scale = 1
 
     proj, img, A = utils.create_projection(path, interior_scale=scale, detector_scale=1.5, angular_scale=1.5)
 
@@ -42,12 +42,10 @@ def main():
     roi_r = [roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.]
     utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
 
-    utils.show_image(img*roi, clim=(-110, 190))
     (_, name, _) = utils.decompose_path(path)
-    callback = utils.IterViewer(img, roi, clim=(-110, 190))
+    callback = utils.IterViewer(img, roi, clim=(0, 1))
+    #callback = utils.IterViewer(img, roi, clim=(utils.normalizedHU(-110), utils.normalizedHU(190)))
     #callback = utils.IterLogger(img, roi, subname=name)
-    print proj.shape
-    return
 
     sirt(A, proj, iter_callback=callback)
 
