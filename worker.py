@@ -80,8 +80,12 @@ def gen_support_constraint():
 def gen_data_constraint():
     y[:, interior_pad:interior_pad + interior_w] = b
 
+def
 
 def main(method):
+    HU_lim = [-1050., 1500.]
+    scale = 0.8
+
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
         sys.exit(1)
@@ -90,13 +94,17 @@ def main(method):
         print "invalid path"
         sys.exit(1)
 
+    img = load_rawimage(path)
+
     ##### begin: interior projection ######
-    scale = 0.8
     # interior projection
-    proj, img, interiorA = utils.create_projection(path, interior_scale=scale)
+    proj = utils.create_projection(path, interior_scale=scale)
+    interiorA = projector(NoI, NoA, NoD)
+    interiorA.update_detectors_length(NoI*scale)
+
 
     # global projection
-    full_proj, img, A = utils.create_projection(path, detector_scale=(1/scale)*1.5, angular_scale=1.5)
+    full_proj, A = utils.create_projection(path, detector_scale=(1/scale)*1.5, angular_scale=1.5)
 
     # truncate global projection
     interior_w = int(img.shape[0]*1.5)

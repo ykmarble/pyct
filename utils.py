@@ -10,6 +10,9 @@ import time
 from math import sqrt, atan2, pi, ceil
 
 def decompose_path(path):
+    """
+    Decompose path into 3 elements, dirname, filename witout extention, extention
+    """
     dname = os.path.dirname(path)
     bname = os.path.basename(path).rsplit(".", 1)
     fname = bname[0]
@@ -28,12 +31,6 @@ def load_rawimage(path):
         height = header[3]
         img = numpy.array(struct.unpack("{}f".format(width*height), f.read()))
     img.resize(height, width)
-    #NoI = img.shape[0]
-    #r =(NoI-1)/2.
-    #mask = numpy.zeros_like(img)
-    #create_elipse_mask((r, r), r-2, r-2, mask)
-    #img[mask!=1] = img[1, NoI/2]
-    #img -= numpy.min(img)
     return img
 
 def save_rawimage(img, outpath):
@@ -68,7 +65,7 @@ def show_image(img, clim=None, output_path="saved_img.dat", caption="ctpy"):
         print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
     return chr(key)
 
-def reshape_to_polar(img, polar_img):
+def convert_to_polar(img, polar_img):
     Nth, Nr = img.shape
     polar_img = numpy.zeros((Nr, Nr))
     pc = Nr / 2.
@@ -112,7 +109,12 @@ def acoord(shape, point):
     return (x + w/2., h/2. - y)
 
 def crop_elipse(img, center, r, value=0):
-
+    """
+    update image inner the elipsoid by replacing new value
+    @img: input image which will be updated
+    @center: pair of the index number which points center of elipsoid
+    @r: tuple (a, b) that (x/a)**2 + (y/b)**2 == 1
+    """
     rx, ry = r
     cx, cy = center
     rx_2 = rx**2
@@ -166,40 +168,46 @@ def draw_graph(data, canvas):
         canvas[h, i] = 0
     return d_mini, d_maxi
 
-def create_projection(path, interior_scale=1, angular_scale=1, detector_scale=1, sample_scale=8):
-    hu_lim = [-1050., 1500.]
+def create_sinogram(img, NoA, NoD, scale=1, sample_scale=8, projector=projector.Projector):
+    """
+    Generate sinogram from `img`.
+    @img: cross sectional image
+    @NoA: the number of angles
+    @NoD: the number of detectors
+    @scale: the scale of detectors array
+    @sample_scale: detector sampling scale
+    """
     assert type(sample_scale) == int
-    img = load_rawimage(path)
-    #img -= hu_lim[0]
-    #img /= hu_lim[1] - hu_lim[0]
+
     NoI = img.shape[0]
-    NoA = int(ceil(NoI * angular_scale))
-    NoD = int(ceil(NoI * detector_scale))
-    if NoD % 2 !=0:
-        NoD += 1
-    overNoA = NoA# * sample_scale
+    overNoA = NoA
     overNoD = NoD * sample_scale
-    A = projector.Projector(NoI, overNoA, overNoD)
-    A.update_detectors_length(int(ceil(NoI*interior_scale)))
+    A = projector(NoI, overNoA, overNoD)
+    A.update_detectors_length(NoI*scale)
     over_proj = zero_proj(A)
     A.forward(img, over_proj)
     proj = numpy.zeros((NoA, NoD))
-    for i in xrange(NoA):
-        for j in xrange(NoD):
-            for k in xrange(sample_scale):
-                proj[i, j] += over_proj[i, j*sample_scale + k]
+    for i in xrange(NoD):
+        proj[:, i] = numpy.sum(over_proj[:, i*sample_scale:(i+1)*sample_scale], axis=1)
     proj /= sample_scale
-    normalA = projector.Projector(NoI, NoA, NoD)
-    normalA.update_detectors_length(NoI * interior_scale)
-    return proj, img, normalA
+    return proj
 
 def interpolate(n1, n2, l):
+    """
+    Calculate interploated sample points for [n1, n2].
+    @n1: first value of interpolation
+    @n2: last value of interpolation
+    @l: length of sample points
+    """
     x = numpy.zeros(l)
     x += n1 * numpy.cos(numpy.linspace(0, numpy.pi/2., l))**2
     x += n2 * numpy.sin(numpy.linspace(0, numpy.pi/2., l))**2
     return x
 
 def inpaint_metal(proj):
+    """
+    Inpainting infinity of `proj` by interpolation.
+    """
     NoA, NoD = proj.shape
     for i in xrange(NoA):
         inf_len = 0
@@ -224,28 +232,6 @@ def normalizedHU(hu):
     hu -= hu_lim[0]
     hu /= hu_lim[1] - hu_lim[0]
     return hu
-
-def mask(proj, recon_proj):
-    NoA, NoD = proj.shape
-    for i in xrange(NoA):
-        inf_len = 0
-        bound_number = [0, 0]  # previous ct-number, next ct-number (both are not inf)
-        for j in xrange(NoD):
-            if proj[i, j] == float("inf"):
-                if inf_len == 0 and j > 0:  # left bound of inf
-                    bound_number[0] = proj[i, j-1]
-                inf_len += 1
-            elif inf_len > 0:  # right bound of inf
-                bound_number[1] = proj[i, j]
-                recon_proj[i, j-inf_len:j] = numpy.linspace(bound_number[0], bound_number[1], inf_len) \
-                                             * numpy.abs(numpy.cos(numpy.linspace(0, numpy.pi, inf_len)))
-                #proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
-                inf_len = 0
-        if inf_len > 0:  # inf on right proj bound
-            bound_number[1] = 0
-            recon_proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)  \
-                                       * numpy.cos(numpy.linspace(0, numpy.pi, inf_len))
-            #proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
 
 
 class IterLogger(object):
