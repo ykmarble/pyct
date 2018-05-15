@@ -3,8 +3,9 @@
 import utils
 from worker import main
 
-def iterative_fbp(A, b, alpha, niter, phi_x=lambda x: x, G=lambda y: y,
-                  x=None, iter_callback=lambda *arg: 0):
+
+def iterative_fbp(A, b, alpha, niter, phi_x=lambda x: x,
+                  G=lambda y: y, x=None, iter_callback=lambda *arg: 0):
     """
     Reconstruct image x from data b such that Ax = b with iterative FBP method.
     @A: projection matrix

@@ -1,90 +1,42 @@
 #!/usr/bin/env python2
 # -*- coding:utf-8 -*-
 
+from projector import Projector
 import utils
+import ctfilter
+from tv_denoise import tv_denoise_chambolle as prox_tv
 import numpy
 import os.path
 import sys
 
-class ExperimentWorker(object):
-    """
-    Worker for performing experiment.
-    Following configurations are available and some of them must be set explicitely.
 
-    algorithm configurations:
-    * method: algorithm implementation
-    * initial_x: initial value of image
-    * initial_y: initial value of sinogram
-    * initial_mu: initial value of dual variable
-    * phi1: proximal operator for image domain
-    * phi2: proximal operator for projection domain
+def interpolate_initial_y(truncated_y, mask_y):
+    y = truncated_y.copy()
+    y[mask_y == 0] = float("inf")
+    utils.inpaint_metal(y)  # it's named by "metal" but this is apricable for truncated sinogram
 
-    input configurations:
-    * original_image_path: path to original image, sinogram will be calculated
-    * sinogram_path: path to input sinogram
-    * ground_truth_path: path to ground truth image
-    * detectors_scale: length of detectors array normalized by image size
-    * num_of_image_side_px
-    * num_of_detectors
-    NOTE: Abort if given configurations are collision.
-          (ex. User specified original_image_path and sinogram_path)
-
-    output configurations:
-
-    """
-    def __init__(self):
-        pass
-
-    def do():
-        pass
-
-def calc_initial_projection_data():
-    # create initial projection data
-    ##### begin: interior #####
-
-    interior_w = b.shape[1]
-    interior_pad = (y.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
-
-    y[:, interior_pad:interior_pad + interior_w] = b
-
-    # zero padding
-    #y[:, :interior_pad] = 0
-    #y[:, interior_pad + interior_w:] = 0
-
-    # flip with reference to boundary
-    #y[:, :interior_pad] = b[:, interior_pad:0:-1]
-    #y[:, interior_pad + interior_w:] = b[:, -1:-interior_pad-1:-1]
-
-    # padding with baundary value
-    #y[:, :interior_pad] = b[:, 0, None]
-    #y[:, interior_pad + interior_w:] = b[:, -1, None]
-
-    # round padding data
-    for i in xrange(y.shape[0]):
-        y[i, :interior_pad] = utils.interpolate(0, b[i, 0], interior_pad)
-        y[i, interior_pad + interior_w:] = utils.interpolate(b[i, -1], 0, interior_pad)
-    ##### end: interior #####
-
-    ##### begin: metal #####
-    #y[:, :] = b[:, :]
-    #utils.inpaint_metal(y)
-    ##### end: metal #####
+    return y
 
 
-def gen_support_constraint():
-    elipse_center = (numpy.array(x.shape)-1) / 2.
-    elipse_r = (numpy.array(x.shape)-1) / 2.
-    elipse = img.copy()
+def gen_support_constraint(img, center, r):
+    # 自動で覆うような楕円を計算してくれるとハッピー
+    elipse_center = (numpy.array(img.shape)-1) / 2.
+    elipse_r = (numpy.array(img.shape)-1) / 2.
+    elipse = numpy.zeros(img.shape)
+
     utils.create_elipse_mask(elipse_center, elipse_r[0], elipse_r[1], elipse)
 
-def gen_data_constraint():
-    y[:, interior_pad:interior_pad + interior_w] = b
+    def proj_elipse_set(x):
+        x[elipse != 1] = 0
 
-def
+    return proj_elipse_set
+
 
 def main(method):
     HU_lim = [-1050., 1500.]
-    scale = 0.8
+    HU_lim = [-110, 190]
+
+    scale = 0.75
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -94,30 +46,140 @@ def main(method):
         print "invalid path"
         sys.exit(1)
 
-    img = load_rawimage(path)
+    img = utils.load_rawimage(path)
+    NoI = img.shape[0]
+    NoA = int(NoI * 1.5)
+    NoD = int(NoI * 1.5)
 
-    ##### begin: interior projection ######
     # interior projection
-    proj = utils.create_projection(path, interior_scale=scale)
-    interiorA = projector(NoI, NoA, NoD)
-    interiorA.update_detectors_length(NoI*scale)
-
+    interior_proj = utils.create_sinogram(img, NoA, NoD, scale=scale, projector=Projector)
+    interior_A = Projector(NoI, NoA, NoD)
+    interior_A.update_detectors_length(NoI*scale)
 
     # global projection
-    full_proj, A = utils.create_projection(path, detector_scale=(1/scale)*1.5, angular_scale=1.5)
+    full_NoA = NoA
+    full_NoD = int(round(NoD*1/scale))
+    assert NoD == int(round(full_NoD * scale))
+    full_A = Projector(NoI, NoA, full_NoD)
 
-    # truncate global projection
-    interior_w = int(img.shape[0]*1.5)
-    interior_pad = (full_proj.shape[1] - interior_w) / 2  # MEMO: Some cases cause error.
-    proj = full_proj[:, interior_pad:interior_pad + interior_w]
-    truncate = (numpy.sin(numpy.linspace(-numpy.pi/2., numpy.pi/2., interior_pad/2))+1)/2.
+    # calculate roi and its sinogram
+    xmask = utils.zero_img(full_A)
+    utils.create_elipse_mask((full_A.center_x, full_A.center_y), NoI/2*scale, NoI/2*scale, xmask)
+    ymask = utils.zero_proj(full_A)
+    full_A.forward(xmask, ymask)
+    ymask[ymask != 0] = 1
 
-    # create roi mask
-    roi = utils.zero_img(interiorA)
-    roi_c = ((roi.shape[0] - 1) / 2., (roi.shape[1] - 1) / 2.)
-    roi_r = [roi.shape[0] * scale / 2., roi.shape[1] * scale / 2.]
-    utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
-    ##### end: interior projection ######
+    # create truncated sinogram
+    full_proj = utils.create_sinogram(img, full_NoA, full_NoD, projector=Projector)
+    full_proj[ymask == 0] = 0
+
+    # estimate initial value
+    initial_x = utils.zero_img(full_A)
+    initial_y = interpolate_initial_y(full_proj, ymask)
+
+    # generate proximal operators
+    tv_alpha = 10
+
+    def prox_tv_all(x):
+        prox_tv(x, tv_alpha)
+
+    def prox_tv_masked(x):
+        prox_tv(x, tv_alpha, mask=xmask)
+
+    def prox_sup(x):
+        gen_support_constraint(img, (full_A.center_x, full_A.center_y), (NoI/2, NoI/2))
+
+    knownmask = utils.zero_img(full_A)
+    utils.create_elipse_mask((full_A.center_x+80, full_A.center_y), 10, 10, knownmask)
+    known = img.copy()
+    known[knownmask != 1] = -2000
+
+    def prox_known(x):
+        x[knownmask == 1] = known[knownmask == 1]
+
+    def phi_x(x):
+        #prox_sup(x)
+        prox_tv_masked(x)
+
+    def phi_y(y):
+        y[ymask != 0] = full_proj[ymask != 0]
+
+    G_id = lambda y: y
+
+    def G_sh(y):
+        ctfilter.shepp_logan_filter(y, sample_rate=2)
+
+    # setup callback routine
+    viewer = utils.IterViewer(img, xmask, clim=HU_lim)
+    logger = utils.IterLogger(img, xmask)
+
+    niter = 500
+
+    method_id = os.path.basename(sys.argv[0])
+
+    # setup method specific configuration and start calculation
+    if "fbp.py" == method_id:
+        method(full_A, initial_y, initial_x)
+        utils.show_image(initial_x*xmask, clim=HU_lim)
+
+    if "iterative_fbp.py" == method_id:
+        #alpha = 0.00001  # id
+        alpha = 0.004  # sh
+        phi_x = prox_known
+        method(interior_A, interior_proj, alpha, niter,
+               #phi_x=phi_x,
+               G=G_sh,
+               x=initial_x,
+               iter_callback=viewer)
+
+    if "sirt.py" == method_id:
+        alpha = 0.00001
+        method(interior_A, interior_proj, alpha, niter,
+               x=initial_x,
+               iter_callback=viewer)
+
+    if "os_sart.py" == method_id:
+        alpha = 0.9
+        nsubset = 10
+        method(interior_A, interior_proj,
+               alpha=alpha,
+               nsubset=nsubset,
+               niter=niter,
+               x=initial_x,
+               iter_callback=viewer)
+
+    if "os_sart_tv.py" == method_id:
+        os_alpha = 0.9
+        tv_alpha = 1
+        tv_alpha_s = 0.9997
+        nsubset = 20
+        ntv = 5
+        method(interior_A, interior_proj,
+               os_alpha=os_alpha,
+               tv_alpha=tv_alpha,
+               tv_alpha_s=tv_alpha_s,
+               nsubset=nsubset,
+               ntv=ntv,
+               niter=niter,
+               x=initial_x,
+               iter_callback=viewer)
+
+    if "app.py" == method_id:
+        alpha = 0.1  # app
+        #phi_x = prox_known
+        def phi_y(y):
+            y[:, :] = interior_proj
+        method(interior_A, alpha, alpha, niter,
+        #method(full_A, alpha, alpha, niter,
+               phi_x=phi_x,
+               phi_y=phi_y,
+               G=G_sh,
+               x=initial_x,
+               #y=initial_y,
+               y=None,
+               mu=None,
+               iter_callback=viewer)
+
 
     ###### begin: metal projection #####
     #proj, img, A = utils.create_projection(path, detector_scale=1.5, angular_scale=1.5)
@@ -149,34 +211,3 @@ def main(method):
     #roi_r = [roi.shape[0] / 2., roi.shape[1] / 2.]
     #utils.create_elipse_mask(roi_c, roi_r[0], roi_r[1], roi)
     ###### end: metal projection #####
-
-    #utils.show_image(masked_img, clim=(-110, 190))
-    #utils.show_image(proj, clim=proj_clim)
-
-    # setup callback routine
-    (_, name, _) = utils.decompose_path(path)
-    #callback = lambda *x: None
-    callback = utils.IterViewer(img, roi, clim=(-110, 190))
-    #callback = utils.IterLogger(img, roi, subname="_app_withfilter_"+name)
-
-    # without filter
-    #alpha = 0.004
-    #alpha = 0.004
-    #recon = app_recon(interiorA, proj, alpha, alpha,1000, iter_callback=callback)
-
-    # with filter
-    #alpha = 0.0465
-    #alpha = 0.018
-
-    #alpha = 1.5
-    alpha = 0.04
-
-    #alpha = 0.001
-    #recon = app_recon(interiorA, proj, alpha, alpha, 500, iter_callback=callback,
-    #                  tv_mask=roi, filtering=True) # 201435.93 400 iter
-    recon = method(A, proj, alpha, alpha, 500, iter_callback=callback,
-                          tv_mask=roi, filtering=True)
-    #alpha = 0.0025
-
-    #recon = fullapp_recon(A, proj, alpha*50, alpha/50, 1000, iter_callback=callback,
-    #                      tv_mask=roi, filtering=False)

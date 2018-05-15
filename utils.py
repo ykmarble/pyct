@@ -7,7 +7,7 @@ import struct
 import numpy
 import cv2
 import time
-from math import sqrt, atan2, pi, ceil
+from math import sqrt, atan2, pi
 
 def decompose_path(path):
     """
@@ -214,8 +214,11 @@ def inpaint_metal(proj):
         bound_number = [0, 0]  # previous ct-number, next ct-number (both are not inf)
         for j in xrange(NoD):
             if proj[i, j] == float("inf"):
-                if inf_len == 0 and j > 0:  # left bound of inf
-                    bound_number[0] = proj[i, j-1]
+                if inf_len == 0:
+                    if j > 0:  # left bound of inf
+                        bound_number[0] = proj[i, j-1]
+                    else:
+                        bound_number[0] = 0
                 inf_len += 1
             elif inf_len > 0:  # right bound of inf
                 bound_number[1] = proj[i, j]
@@ -225,7 +228,7 @@ def inpaint_metal(proj):
         if inf_len > 0:  # inf on right proj bound
             bound_number[1] = 0
             #proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)
-            proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
+            proj[i, NoD-inf_len:NoD] = interpolate(bound_number[0], bound_number[1], inf_len)
 
 def normalizedHU(hu):
     hu_lim = [-1050., 1500.]
@@ -251,7 +254,7 @@ class IterLogger(object):
         logname = "iterlog.txt"
         self.log_handler = open(os.path.join(self.dirpath, logname), "w")
 
-    def __call__(self, i, x, y):
+    def __call__(self, i, x, y, *argv, **argdict):
         rmse = self._rmse(x)
         print i+1, rmse
         self.log_handler.write("{} {}\n".format(i+1, rmse))
@@ -280,9 +283,12 @@ class IterViewer(object):
         self.clim = clim
         self.N = self.img.shape[0] * self.img.shape[0]
         self.niter = niter
+        self.user_handler = []
 
-    def __call__(self, i, x, y):
+    def __call__(self, i, x, y, *argv, **argdict):
         hu_lim = [-1050., 1500.]
         print i+1, numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / self.N)
+        for h in self.user_handler:
+            h(x, y)
         if (i+1) % self.niter == 0:
             show_image(x, clim=self.clim)
