@@ -41,9 +41,11 @@ def save_rawimage(img, outpath):
         f.write(header)
         f.write(payload)
 
-def normalize(img, clim):
-    img -= clim[0]
-    img /= clim[1] - clim[0]
+def normalize(img):
+    minv = numpy.min(img)
+    maxv = numpy.max(img)
+    img -= minv
+    img /= maxv - minv
 
 
 def show_image(img, clim=None, output_path="saved_img.dat", caption="ctpy"):
@@ -55,7 +57,9 @@ def show_image(img, clim=None, output_path="saved_img.dat", caption="ctpy"):
     if clim is None:
         clim = (numpy.min(img), numpy.max(img))
     normalized = img.copy()
-    normalize(normalized, clim)
+    normalized[normalized < clim[0]] = clim[0]
+    normalized[normalized > clim[1]] = clim[1]
+    normalize(normalized)
     cv2.imshow(caption, normalized)
     key = cv2.waitKey(0)
     if key == ord("q"):
@@ -108,21 +112,20 @@ def acoord(shape, point):
     x, y = point
     return (x + w/2., h/2. - y)
 
-def crop_elipse(img, center, r, value=0):
+def crop_elipse(img, center, a, b, value=0):
     """
     update image inner the elipsoid by replacing new value
     @img: input image which will be updated
     @center: pair of the index number which points center of elipsoid
     @r: tuple (a, b) that (x/a)**2 + (y/b)**2 == 1
     """
-    rx, ry = r
-    cx, cy = center
-    rx_2 = rx**2
-    ry_2 = ry**2
-
-    for yi in xrange(img.shape[1]):
-        for xi in xrange(img.shape[0]):
-            if (yi - cy)**2 / ry_2 + (xi - cx)**2 / rx_2 > 1:
+    x, y = center
+    a_2 = a**2.
+    b_2 = b**2.
+    ab_2 = a_2 * b_2
+    for xi in xrange(img.shape[1]):
+        for yi in xrange(img.shape[0]):
+            if a_2 * (y - yi)**2 + b_2 * (x - xi)**2 < ab_2:
                 img[yi, xi] = value
 
 def create_elipse_mask(center, a, b, out, value=1):
@@ -135,15 +138,8 @@ def create_elipse_mask(center, a, b, out, value=1):
     @a : the radius of x-axis
     @b : the radius of y-axis
     """
-    x, y = center
-    a_2 = a**2.
-    b_2 = b**2.
-    ab_2 = a_2 * b_2
     out[:, :] = 0
-    for xi in xrange(out.shape[1]):
-        for yi in xrange(out.shape[0]):
-            if a_2 * (y - yi)**2 + b_2 * (x - xi)**2 < ab_2:
-                out[yi, xi] = value
+    crop_elipse(out, center, a, b, value)
 
 def empty_img(A):
     return numpy.empty(A.get_image_shape())
@@ -238,9 +234,15 @@ def normalizedHU(hu):
 
 
 class IterLogger(object):
-    def __init__(self, original_img, roi, subname=""):
-        self.img = original_img
-        self.roi = roi
+    def __init__(self, xtr, ytr, xmask, A, subname=""):
+        self.xtr = xtr
+        self.ytr = ytr
+        self.xmask = xmask
+
+        self.xn = numpy.sum(xmask, axis=None)
+        self.yn = ytr.shape[0] * ytr.shape[0]
+        self.proj = zero_proj(A)
+        self.y_max = numpy.max(numpy.abs(self.ytr))
 
         # generate the output directory path and create its directory
         timestamp = str(int(time.time()))
@@ -255,9 +257,11 @@ class IterLogger(object):
         self.log_handler = open(os.path.join(self.dirpath, logname), "w")
 
     def __call__(self, i, x, y, *argv, **argdict):
-        rmse = self._rmse(x)
-        print i+1, rmse
-        self.log_handler.write("{} {}\n".format(i+1, rmse))
+        rmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
+        self.A.forward(x, self.proj)
+        nnorm = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2, axis=None)) / self.y_max / self.yn
+        print i+1, rmse, nnorm
+        self.log_handler.write("{} {} {}\n".format(i+1, rmse, nnorm))
         self.log_handler.flush()
 
         if (i+1) % 10 == 0:
@@ -271,24 +275,29 @@ class IterLogger(object):
             raise Exception("{} is already used as a file.".format(path))
         os.makedirs(path)
 
-    def _rmse(self, x):
-        N = x.shape[0] * x.shape[1]
-        return numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / N)
-
 
 class IterViewer(object):
-    def __init__(self, original_img, roi, clim=None, niter=10):
-        self.img = original_img
-        self.roi = roi
+    def __init__(self, xtr, ytr, xmask, A, clim=None, niter=10):
+        self.xtr = xtr
+        self.ytr = ytr
+        self.xmask = xmask
+        self.A = A
         self.clim = clim
-        self.N = self.img.shape[0] * self.img.shape[0]
         self.niter = niter
-        self.user_handler = []
+
+        self.xn = numpy.sum(xmask, axis=None)
+        self.yn = ytr.shape[0] * ytr.shape[0]
+        self.xmax = numpy.max(xtr) - numpy.min(xtr)
+        self.ymax = numpy.max(ytr) - numpy.min(ytr)
+        self.proj = zero_proj(A)
+        self.proj_lim = (numpy.max(self.ytr), numpy.min(self.ytr))
 
     def __call__(self, i, x, y, *argv, **argdict):
-        hu_lim = [-1050., 1500.]
-        print i+1, numpy.sqrt(numpy.sum(((x - self.img)*self.roi)**2) / self.N)
-        for h in self.user_handler:
-            h(x, y)
+        self.A.forward(x, self.proj)
+        xmse = numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn
+        ymse = numpy.sum((self.proj - self.ytr)**2) / self.yn
+        print i+1,
+        print numpy.sqrt(xmse),
+        print numpy.sqrt(ymse)
         if (i+1) % self.niter == 0:
             show_image(x, clim=self.clim)
