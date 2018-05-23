@@ -28,7 +28,7 @@ def path_picker(path):
 
 def main():
     if len(sys.argv) != 2 and len(sys.argv) != 4:
-        print "Usage: {} rawfile".format(sys.argv[0])
+        print "Usage: {} <rawfile> [c-low, c-high]".format(sys.argv[0])
         return
 
     path = sys.argv[1]

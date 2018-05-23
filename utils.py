@@ -200,7 +200,7 @@ def interpolate(n1, n2, l):
     x += n2 * numpy.sin(numpy.linspace(0, numpy.pi/2., l))**2
     return x
 
-def inpaint_metal(proj):
+def inpaint_metal(proj, support=0):
     """
     Inpainting infinity of `proj` by interpolation.
     """
@@ -214,7 +214,7 @@ def inpaint_metal(proj):
                     if j > 0:  # left bound of inf
                         bound_number[0] = proj[i, j-1]
                     else:
-                        bound_number[0] = 0
+                        bound_number[0] = support
                 inf_len += 1
             elif inf_len > 0:  # right bound of inf
                 bound_number[1] = proj[i, j]
@@ -222,7 +222,7 @@ def inpaint_metal(proj):
                 proj[i, j-inf_len:j] = interpolate(bound_number[0], bound_number[1], inf_len)
                 inf_len = 0
         if inf_len > 0:  # inf on right proj bound
-            bound_number[1] = 0
+            bound_number[1] = support
             #proj[i, -inf_len:] = numpy.linspace(bound_number[0], bound_number[1], inf_len)
             proj[i, NoD-inf_len:NoD] = interpolate(bound_number[0], bound_number[1], inf_len)
 
@@ -238,30 +238,39 @@ class IterLogger(object):
         self.xtr = xtr
         self.ytr = ytr
         self.xmask = xmask
+        self.A = A
 
         self.xn = numpy.sum(xmask, axis=None)
         self.yn = ytr.shape[0] * ytr.shape[0]
         self.proj = zero_proj(A)
         self.y_max = numpy.max(numpy.abs(self.ytr))
+        self.initialized = False
 
         # generate the output directory path and create its directory
         timestamp = str(int(time.time()))
         (_, method, _) = decompose_path(sys.argv[0])
 
         self.dirpath = os.path.join(os.getcwd(), "iterout", method, timestamp+subname)
+
+    def initialize(self):
         print "output dir: {}".format(self.dirpath)
         self._mkdir(self.dirpath)
 
         # log file
         logname = "iterlog.txt"
         self.log_handler = open(os.path.join(self.dirpath, logname), "w")
+        self.initialized = True
 
     def __call__(self, i, x, y, *argv, **argdict):
-        rmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
+        if not self.initialized:
+            self.initialize()
+
         self.A.forward(x, self.proj)
-        nnorm = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2, axis=None)) / self.y_max / self.yn
-        print i+1, rmse, nnorm
-        self.log_handler.write("{} {} {}\n".format(i+1, rmse, nnorm))
+        xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
+        yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)
+
+        print i+1, xrmse, yrmse
+        self.log_handler.write("{} {} {} {}\n".format(i+1, xrmse, yrmse, time.time()))
         self.log_handler.flush()
 
         if (i+1) % 10 == 0:
@@ -294,10 +303,9 @@ class IterViewer(object):
 
     def __call__(self, i, x, y, *argv, **argdict):
         self.A.forward(x, self.proj)
-        xmse = numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn
-        ymse = numpy.sum((self.proj - self.ytr)**2) / self.yn
-        print i+1,
-        print numpy.sqrt(xmse),
-        print numpy.sqrt(ymse)
+        show_image(self.proj-self.ytr)
+        xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
+        yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)
+        print i+1, xrmse, yrmse
         if (i+1) % self.niter == 0:
-            show_image(x, clim=self.clim)
+            show_image(x*self.xmask, clim=self.clim)

@@ -8,7 +8,7 @@ import numpy
 
 
 def tv_derivative(img, derivative):
-    epsilon = 1e-3
+    epsilon = 1e-5
     mu = numpy.full_like(img, epsilon**2)
     # [1:-2, 1:-2] (m, n)
     # [2:-1, 1:-2] (m+1, n)
@@ -45,6 +45,7 @@ def os_sart_tv(A, b, os_alpha=0.9, tv_alpha=0.01, tv_alpha_s=0.9997,
                 beta = numpy.max(x) / numpy.max(d)
                 x -= tv_alpha * beta * d
                 tv_alpha *= tv_alpha_s
+        A.forward(x, proj)
         iter_callback(i, x, proj)
 
 

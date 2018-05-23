@@ -4,7 +4,7 @@ import utils
 from worker import main
 
 
-def ladmm(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y: y,
+def ladmm(A, alpha, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y: y,
           x=None, y=None, mu=None, iter_callback=lambda *arg: 0):
     """
     Perform interior CT image reconstruction with Linearized ADMM method.
@@ -20,6 +20,8 @@ def ladmm(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda 
     @mu: initial dual variable
     @iter_callback : callback function called each iterations
     """
+    beta = 1
+
     if x is None:
         x = utils.zero_img(A)
     if mu is None:

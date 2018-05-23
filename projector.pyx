@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
+import ctfilter
+import skimage.filters
 import numpy
 cimport numpy
 DTYPE = numpy.float
@@ -43,8 +45,8 @@ class Projector(object):
         self.update_x_offset(0)
         self.update_y_offset(0)
         self.update_detectors_offset(0)
-        self.update_angular_range(M_PI)          # domain of theta [0, angular_range]
-        self.update_detectors_length(self.NoI) # length of the string of detectors
+        self.update_angular_range(M_PI)         # domain of theta [0, angular_range)
+        self.update_detectors_length(self.NoI)  # length of the string of detectors
 
         # variables used when computing projection
         # calculated from above variables automatically
@@ -101,10 +103,13 @@ class Projector(object):
     def forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj):
         assert self.is_valid_dimension(img, proj)
         self._projection(img, proj, False)
+        #ctfilter.fir_gauss_1d(proj)
 
     def backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img):
         assert self.is_valid_dimension(img, proj)
         self._projection(proj, img, True)
+        #img[:, :] = skimage.filters.gaussian(img, 0.8)
+
 
     def partial_forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
@@ -115,6 +120,7 @@ class Projector(object):
         if r_indexes is not None:
             assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
         self._projection(img, proj, False, th_indexes=th_indexes, r_indexes=r_indexes)
+        #ctfilter.fir_gauss_1d(proj)
 
     def partial_backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
                          numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
@@ -125,16 +131,19 @@ class Projector(object):
         if r_indexes is not None:
             assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
         self._projection(proj, img, True, th_indexes=th_indexes, r_indexes=r_indexes)
+        #img[:, :] = skimage.filters.gaussian(img, 0.8)
 
     def forward_with_mask(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
                           numpy.ndarray[numpy.int_t, ndim=2] mask):
         assert self.is_valid_dimension(img, proj)
         self._projection(img, proj, False, mask)
+        #ctfilter.fir_gauss_1d(proj)
 
     def backward_with_mask(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
                           numpy.ndarray[numpy.int_t, ndim=2] mask):
         assert self.is_valid_dimension(img, proj)
         self._projection(proj, img, True, mask)
+        #img[:, :] = skimage.filters.gaussian(img, 0.8)
 
     @cython.boundscheck(False)
     def _projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward,

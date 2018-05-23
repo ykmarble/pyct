@@ -43,19 +43,21 @@ def diff_calc_scale(A, subsets):
 
 def calc_scale(A, subsets):
     if isinstance(A, differencial.Projector):
+        print "use diff_calc_scale"
         return diff_calc_scale(A, subsets)
 
     if not isinstance(A, projector.Projector):
         raise NotImplementedError("unknown projector matrix")
 
     # 吸収版｡
-    a_ip = utils.empty_proj(A)
-    img = utils.empty_img(A)
+    a_ip = utils.zero_proj(A)
+    img = utils.zero_img(A)
     img[:, :] = 1
     A.forward(img, a_ip)
+    a_ip[a_ip == 0] = 1
 
-    a_pj_subset = [utils.empty_img(A) for i in xrange(len(subsets))]
-    proj = utils.empty_proj(A)
+    a_pj_subset = [utils.zero_img(A) for i in xrange(len(subsets))]
+    proj = utils.zero_proj(A)
     proj[:, :] = 1
     for i in xrange(len(subsets)):
         A.partial_backward(proj, a_pj_subset[i], subsets[i], None)
@@ -106,7 +108,9 @@ def os_sart(A, b, alpha=0.9, nsubset=10, niter=1000, x=None, iter_callback=lambd
     a_ip, a_pj_subset = calc_scale(A, subsets)
 
     for i in xrange(niter):
-        os_sart_mainloop(A, b, x, alpha, a_ip, a_pj_subset, subsets, i, img, proj)
+        for nart in xrange(nsubset):
+            os_sart_mainloop(A, b, x, alpha, a_ip, a_pj_subset, subsets, nart, img, proj)
+        A.forward(x, proj)
         iter_callback(i, x, proj)
 
 
