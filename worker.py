@@ -80,6 +80,7 @@ def main(method):
 
     # create truncated sinogram
     full_proj = utils.create_sinogram(img, full_NoA, full_NoD, projector=Projector, sample_scale=4)
+    scout_proj = full_proj.copy()
     support = full_proj[0, 0]
     full_proj[ymask == 0] = 0
 
@@ -87,17 +88,15 @@ def main(method):
     roundmask[:, full_NoD/2-NoD/2:full_NoD/2] = utils.interpolate(0, 1, NoD/2)[None, :]
     roundmask[:, full_NoD/2:full_NoD/2+NoD/2] = utils.interpolate(1, 0, NoD/2)[None, :]
 
-    ymask[supmask_sin==0] = 1  # support area is also ymask
-
     # estimate initial value
     initial_x = utils.zero_img(full_A)
     initial_y = interpolate_initial_y(full_proj, ymask, support)
 
     # generate proximal operators
-    tv_alpha = 0.01
+    tv_alpha = 0.1
 
     def prox_tv_all(x):
-        prox_tv(x, tv_alpha)
+        x[:, :] = sk_tv(x, 1./tv_alpha)
 
     def prox_tv_masked(x):
         prox_tv(x, tv_alpha, mask=xmask)
@@ -107,11 +106,6 @@ def main(method):
         x[supmask == 0] = 0
         x[x < 0] = 0
         x[x > 1] = 1
-
-    def prox_sup_sin(y):
-        y[supmask_sin == 0] = 0
-
-
     known_mask = utils.zero_img(full_A)
     utils.create_elipse_mask((full_A.center_x+40, full_A.center_y+20), 10, 10, known_mask)
     known = img.copy()
@@ -135,15 +129,30 @@ def main(method):
     def phi_x(x):
         prox_sup(x)
         #prox_tv_masked(x)
+        prox_tv_all(x)
         #prox_known(x)
         #prox_edgeblur(x)
 
         #x[:, :] = skimage.filters.gaussian(x)
-        x[:, :] = sk_tv(x, 1)
+        x[:, :] = sk_tv(x, 100)
+
+    def prox_b(y):
+        y[ymask == 1] = full_proj[ymask == 1]
+
+    scout_mask = utils.zero_proj(full_A)
+    scout_mask[0] = 1
+    scout_mask[scout_mask.shape[0]/2] = 1
+
+    def prox_scout(y):
+        y[scout_mask == 1] = scout_proj[scout_mask == 1]
+
+    def prox_sup_sin(y):
+        y[supmask_sin == 0] = 0
 
     def phi_y(y):
         #y[:] = y*(1-roundmask) + full_proj*roundmask
-        y[ymask==1] = full_proj[ymask==1]
+        prox_b(y)
+        #prox_scout(y)
         prox_sup_sin(y)
 
     def G_id(y):
@@ -158,9 +167,9 @@ def main(method):
 
     # setup callback routine
     viewer = utils.IterViewer(img, interior_proj, xmask, interior_A, clim=HU_lim)
-    logger = utils.IterLogger(img, interior_proj, xmask, interior_A, subname="tv")
+    logger = utils.IterLogger(img, interior_proj, xmask, interior_A, subname="")
 
-    niter = 20000
+    niter = 2000
 
     method_id = os.path.basename(sys.argv[0])
 
@@ -184,6 +193,17 @@ def main(method):
                G=G_sh,
                x=initial_x,
                iter_callback=logger)
+
+    if "estimate_missing_line.py" == method_id:
+        alpha = 0.04
+        phi_x = prox_known
+        method(full_A, full_proj, alpha, niter,
+               phi_x=phi_x,
+               phi_y=phi_y,
+               G=G_sh,
+               x=initial_x,
+               y=initial_y,
+               iter_callback=viewer)
 
     if "estimate_missing_line.py" == method_id:
         alpha = 0.04
@@ -242,7 +262,7 @@ def main(method):
                y=initial_y,
                #y=None,
                mu=None,
-               iter_callback=logger)
+               iter_callback=viewer)
 
     if "ladmm.py" == method_id:
         #alpha = 0.004

@@ -303,7 +303,6 @@ class IterViewer(object):
 
     def __call__(self, i, x, y, *argv, **argdict):
         self.A.forward(x, self.proj)
-        show_image(self.proj-self.ytr)
         xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
         yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)
         print i+1, xrmse, yrmse
