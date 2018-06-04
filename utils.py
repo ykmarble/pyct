@@ -301,7 +301,7 @@ class IterViewer(object):
         self.proj = zero_proj(A)
         self.proj_lim = (numpy.max(self.ytr), numpy.min(self.ytr))
 
-    def __call__(self, i, x, y, *argv, **argdict):
+    def __call__(self, i, x, *argv, **argdict):
         self.A.forward(x, self.proj)
         xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
         yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)

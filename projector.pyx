@@ -9,7 +9,7 @@ DTYPE = numpy.float
 ctypedef numpy.float_t DTYPE_t
 cimport cython
 from cython.parallel import *
-from libc.math cimport M_PI, sin, cos, floor, fabs
+from libc.math cimport M_PI, sin, cos, floor, ceil, round, fabs
 
 class Projector(object):
     """
@@ -66,6 +66,14 @@ class Projector(object):
     def get_projector_shape(self):
         return (self.NoA, self.NoD)
 
+    def convidx_img2r(self, yi, xi, ti):
+        th = ti * self.dtheta
+        x = xi - self.center_x
+        y = self.center_y - yi
+        r = (x * sin(th) + y * cos(th)) / self.dr
+        r += self.detectors_center
+        return int(round(r))
+
     def update_x_offset(self, offset):
         self.x_offset = offset
         self.center_x = self.x_offset + self.image_origin
@@ -84,7 +92,7 @@ class Projector(object):
 
     def update_detectors_length(self, length):
         self.detectors_length = float(length)
-        self.dr = self.detectors_length / (self.NoD - 1)
+        self.dr = self.detectors_length / self.NoD
 
     def update_center_x(self, x):
         self.center_x = x
@@ -303,4 +311,4 @@ cdef inline int is_valid_index(int xi, int yi, double center_x, double center_y,
     cdef double y = center_y - yi
     return 0 <= xi and xi < NoI \
       and 0 <= yi and yi < NoI \
-      and 4 * (x * x + y * y) < (NoI - 1) * (NoI -1)
+      #and 4 * (x * x + y * y) < (NoI - 1) * (NoI -1)

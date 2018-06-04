@@ -35,6 +35,7 @@ def inv_ramp_filter(proj):
     freq_proj *= ramp[None, :]
     proj[:] = numpy.fft.ifft(freq_proj).real
 
+
 def shepp_logan_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
@@ -59,6 +60,7 @@ def ram_lak_filter(proj, sample_rate=1):
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter_h, proj3[i], "valid")
 
+
 def fir_gauss_1d(proj):
     """
     Apply finite inpluse response gaussian bluring whose sigma is 0.8.
@@ -68,6 +70,7 @@ def fir_gauss_1d(proj):
     h = numpy.array([ 0.23899427,  0.52201147,  0.23899427])  # N(0, 0.8)
     for i in xrange(NoA):
         proj[i] = numpy.convolve(h, proj[i], "same")
+
 
 def local_shepp_logan_filter(proj, sample_rate=1, filter_width=3):
     NoA, NoD = proj.shape

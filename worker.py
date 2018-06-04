@@ -40,7 +40,7 @@ def main(method):
     HU_lim = [0.4, 0.6]
     HU_lim = [0.3, 0.45]
 
-    scale = 0.7
+    scale = 0.5
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -101,11 +101,11 @@ def main(method):
     def prox_tv_masked(x):
         prox_tv(x, tv_alpha, mask=xmask)
 
-
     def prox_sup(x):
         x[supmask == 0] = 0
         x[x < 0] = 0
         x[x > 1] = 1
+
     known_mask = utils.zero_img(full_A)
     utils.create_elipse_mask((full_A.center_x+40, full_A.center_y+20), 10, 10, known_mask)
     known = img.copy()
@@ -134,7 +134,7 @@ def main(method):
         #prox_edgeblur(x)
 
         #x[:, :] = skimage.filters.gaussian(x)
-        x[:, :] = sk_tv(x, 100)
+        x[:, :] = sk_tv(x, 800)
 
     def prox_b(y):
         y[ymask == 1] = full_proj[ymask == 1]
