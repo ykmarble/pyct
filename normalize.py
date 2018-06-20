@@ -33,7 +33,7 @@ def main():
         utils.crop_elipse(mask, (c, c), a-0.5, b-0.5, value=1)
         img[mask == 0] = 0
 
-        img[-20:] = 0
+#        img[-20:] = 0
 
         img[img < 0] = 0
         utils.normalize(img)

@@ -262,7 +262,7 @@ def main(method):
                y=initial_y,
                #y=None,
                mu=None,
-               iter_callback=viewer)
+               iter_callback=logger)
 
     if "ladmm.py" == method_id:
         #alpha = 0.004
@@ -278,7 +278,7 @@ def main(method):
                y=initial_y,
                #y=None,
                mu=None,
-               iter_callback=viewer)
+               iter_callback=logger)
 
 
     ###### begin: metal projection #####

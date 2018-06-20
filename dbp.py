@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
+from cython_filter import weighted_hilbert_filter
 import utils
 import projector
 import numpy
@@ -9,6 +10,30 @@ import sys
 from skimage.restoration import denoise_tv_bregman as sk_tv
 
 viewer = None
+
+W_sup = 0.85
+
+#def weighted_hilbert_filter(f, W):
+#    assert len(f.shape) == 2
+#    sl = numpy.linspace(-W_sup, W_sup, f.shape[1])
+#    out = numpy.zeros_like(f, dtype=float)
+#    for i in xrange(f.shape[0]):
+#        print i
+#        for j in xrange(f.shape[1]):
+#            t = j / float(f.shape[1]) * 2 - 1
+#            out[i, j] = sum(f[i, k] / (s - t) * W[k] for k, s in enumerate(sl) if s - t != 0 and -1 <= s <= 1) / W[j]
+#    out /= math.pi
+#    return out
+
+
+def finite_hilbert_filter(f):
+    return weighted_hilbert_filter(f, numpy.ones(f.shape[1]), W_sup)
+
+
+def inv_finite_hilbert_filter(f):
+    W = numpy.sqrt(1 - numpy.linspace(-W_sup, W_sup, f.shape[1])**2)
+    return -weighted_hilbert_filter(f, W, W_sup) / W
+
 
 def freq_hilbert_filter(f, scale=10):
     j = complex("j")
@@ -26,69 +51,24 @@ def inv_freq_hilbert_filter(f):
     return -freq_hilbert_filter(f, 1)[:, :256]
 
 
-def infinite_hilbert_filter(f):
-    assert len(f.shape) == 2
-    narray, length = f.shape
-    filter_width = length + 1 if length % 2 == 0 else length  # must be a odd number larger than NoD
-    filter_x = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
-    filter_x = numpy.arange(-(filter_width / 2), filter_width / 2 + 1)
-    ci = filter_width / 2
-    odds = [(i - ci) % 2 == 1 for i in xrange(filter_width)]
-    filter_h = numpy.zeros_like(filter_x, dtype=float)
-    filter_h[odds] = 2. / filter_x[odds] / math.pi
-    print filter_h
-    h = numpy.zeros((f.shape[0], f.shape[1] + filter_h.shape[0] - 1))
-    for i in xrange(f.shape[0]):
-        h[i] = numpy.convolve(f[i], filter_h, "full")
-    return h
-
-
-def inv_infinite_hilbert_filter(f):
-    return -infinite_hilbert_filter(f)
-    full = -hilbert_filter(f)
-    utils.show_image(full)
-    length = full.shape[1]
-    if length % 2 == 0:
-        NoD = length / 2
-        s = NoD / 2
-        return full[:, s:s+NoD]
-    else:
-        NoD = (length + 1) / 2
-        s = (NoD - 1) / 2
-        return full[:, s:s+NoD]
-
-
-def hilbert_filter(f):
-    assert len(f.shape) == 2
-    h = numpy.zeros_like(f)
-    narray, length = f.shape
-    filter_width = length + 1 if length % 2 == 0 else length  # must be a odd number larger than NoD
-    filter_x = numpy.linspace(-(filter_width / 2), filter_width / 2, filter_width)
-    ci = filter_width / 2
-    odds = [(i - ci) % 2 == 1 for i in xrange(filter_width)]
-    filter_h = numpy.zeros_like(filter_x)
-    filter_h[odds] = 2. / filter_x[odds] / math.pi
-    proj3 = numpy.concatenate((numpy.zeros((narray, length/2)), f, numpy.zeros((narray, length/2))), axis=1)  # padding 0
-    for i in xrange(f.shape[0]):
-        h[i] = numpy.convolve(filter_h, proj3[i], "valid")
-    return h
-
-
-def inv_hilbert_filter(f):
-    return -hilbert_filter(f)
-
 
 def dbp(A, proj, img, theta=0):
     """
     Perform dbp in geometry defined by system matrix A.
     """
+    th_sgn = 1
+    if theta >= math.pi:
+        theta -= math.pi
+        th_sgn = -1
+
     assert 0 <= theta < math.pi
 
     # partial differential of r
-    proj_dr = proj.copy()
-    proj_dr[:, 1:] -= proj_dr[:, :-1]
-    proj_dr[:, 0] = 0
-    proj_dr /= 2
+    proj_dr = numpy.zeros_like(proj.copy())
+    proj_dr[:, 1:-1] += proj[:, 1:-1] - proj[:, :-2]
+    proj_dr[:, 1:-1] += proj[:, 2:] - proj[:, 1:-1]
+    proj_dr /= 2.
+
 
     # decide initial sgn and sgn flipping point
     #sgn = 1 if math.cos(-theta) >= 0 else -1
@@ -98,16 +78,17 @@ def dbp(A, proj, img, theta=0):
     #    flip_idx = int(math.ceil((theta - math.pi/2) / A.dtheta))
 
     sgn = 1 if math.sin(-theta) > 0 else -1
+    sgn *= th_sgn
     flip_idx = int(math.ceil(theta / A.dtheta))
 
     proj_dr[:flip_idx] *= sgn
     proj_dr[flip_idx:] *= -sgn
 
-    doffset = A.detectors_offset
-    A.update_detectors_offset(doffset + 0.5)
+    #doffset = A.detectors_offset
+    #A.update_detectors_offset(doffset + 0.5)
     A.backward(proj_dr, img)
-    A.update_detectors_offset(doffset)
-    img /= 256
+    img *= -1
+    #A.update_detectors_offset(doffset)
 
 
 def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1000):
@@ -116,6 +97,8 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
     Prior region is very restricted because of implementation difficulty.
     Hilbert lines are along with x-axis.
     """
+    pocs2 = True
+
     if sup_mask is None:
         sup_mask = utils.zero_img(A)
         sup_mask[:] = 1
@@ -123,7 +106,17 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
     prior = prior * prior_mask
 
     hilbert_img = utils.zero_img(A)
+    inv_hilbert_img = utils.zero_img(A)
     dbp(A, b, hilbert_img, 0)
+    dbp(A, b, inv_hilbert_img, math.pi)
+
+    W = numpy.ones(hilbert_img.shape[1], dtype=float)
+    H = freq_hilbert_filter
+    Ht = inv_freq_hilbert_filter
+    if pocs2:
+        W = numpy.sqrt(1 - numpy.linspace(-W_sup, W_sup, hilbert_img.shape[1])**2)
+        H = finite_hilbert_filter
+        Ht = inv_finite_hilbert_filter
 
     energy = numpy.zeros(A.NoI)
     for i in xrange(A.NoI):
@@ -134,7 +127,7 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
     p4_mask = sup_mask - sup_mask * prior_mask  # maybe 2d
     p4_mask[energy == 0] = 0
     p4_energy = energy - numpy.sum(prior, axis=1)
-    p4_denom = numpy.sum(p4_mask, axis=1)
+    p4_denom = numpy.sum(p4_mask / W, axis=1)
     p4_denom[p4_denom == 0] = 1
 
     x = utils.zero_img(A)
@@ -143,10 +136,19 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
 
     for i in xrange(niter):
         # p1 data constraint
-        fullh = freq_hilbert_filter(x)
-        h = fullh[:, :256]
-        h[roi == 1] = hilbert_img[roi == 1]
-        x = inv_freq_hilbert_filter(fullh)
+        C = numpy.sum(x, axis=1)[:, None] / W / math.pi  / 100
+        if i % 2 == 0:
+            fullh = -H(x)
+            h = fullh[:, :256]
+            h[roi == 1] = inv_hilbert_img[roi == 1]
+            x = -Ht(fullh)
+        else:
+            fullh = H(x)
+            h = fullh[:, :256]
+            h[roi == 1] = hilbert_img[roi == 1]
+            x = Ht(fullh)
+        if pocs2:
+            x += C
 
         # p2 support constraint
         x[sup_mask == 0] = 0
@@ -155,74 +157,87 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
         x[prior_mask == 1] = prior[prior_mask == 1]
 
         # p4 energy constraint: line integral along with hilbert line must be the same with observed energy
-        x += ((p4_energy - numpy.sum(x * p4_mask, axis=1)) / p4_denom)[:, None]*p4_mask
+        x += ((p4_energy - numpy.sum(x * p4_mask, axis=1)) / p4_denom)[:, None] * p4_mask
+        x /= W
 
         # p5 non-negative constraint
         x[x < 0] = 0
 
-        x[:, :] = sk_tv(x, 10000)
+        #x[:, :] = sk_tv(x, 10000)
+        x[:, :] = sk_tv(x, 500)
 
         viewer(i, x)
 
 
+
 def test_total_hilbert_conversions_and_dbp(img):
+    scale = 1
     NoI = NoA = NoD = img.shape[0]
     A = projector.Projector(NoI, NoA, NoD)
-    proj = utils.zero_proj(A)
+    proj = utils.create_sinogram(img, NoA, NoD, scale)
     A.forward(img, proj)
 
     dbp_img = utils.zero_img(A)
     dbp(A, proj, dbp_img, 0)
 
-    hilbert_img = freq_hilbert_filter(img)
-    print numpy.sum(hilbert_img.real), numpy.sum(hilbert_img.imag)
+    hilbert_img = finite_hilbert_filter(img)
 
     # must be the same image
     print "h {}, {}".format(numpy.min(hilbert_img), numpy.max(hilbert_img))
     print "d {}, {}".format(numpy.min(dbp_img), numpy.max(dbp_img))
-    utils.show_image(hilbert_img.real)
-    #utils.show_image(dbp_img)
+
+    roi = utils.zero_img(A)
+    utils.create_elipse_mask(((NoI-1)/2., (NoI-1)/2.), (NoI-1)/2.*scale-2, (NoI-1)/2.*scale-2, roi)
 
     # original image will be showen
-    inv = inv_freq_hilbert_filter(hilbert_img)
+    inv = inv_finite_hilbert_filter(hilbert_img)
+    W = numpy.sqrt(1 - numpy.linspace(-W_sup, W_sup, inv.shape[1])**2)
+    C = numpy.sum(inv, axis=1)[:, None] / W / math.pi / 23
+    utils.show_image(C)
+    inv += C
     print "{}, {}".format(numpy.min(inv), numpy.max(inv))
-    utils.show_image(inv)
-    utils.show_image(inv-img)
+    utils.show_image(img, clim=(0.45, 0.55))
+    utils.show_image(inv, clim=(0.45, 0.55))
 
-
+def printl(l):
+    print l
 
 def main():
-    scale = 0.5
+    scale = 1
 
     img = utils.load_rawimage(sys.argv[1])
-    #test_total_hilbert_conversions_and_dbp(img)
+    test_total_hilbert_conversions_and_dbp(img)
 
-    NoI = NoA = NoD = img.shape[0]
+    NoI = img.shape[0]
+    NoA = NoI
+    NoD = int(NoI * scale)
     A = projector.Projector(NoI, NoA, NoD)
-    A.update_detectors_length(0.5 * NoI)
+    A.update_detectors_length(scale * NoI)
+    bigA = projector.Projector(NoI, NoA, NoD)
+    bigA.update_detectors_length(scale * NoI)
 
-    proj = utils.zero_proj(A)
-    A.forward(img, proj)
+    proj = utils.create_sinogram(img, NoA, NoD, scale)
 
     roi = utils.zero_img(A)
     utils.create_elipse_mask(((NoI-1)/2., (NoI-1)/2.), (NoI-1)/2.*scale-2, (NoI-1)/2.*scale-2, roi)
 
     sup = utils.zero_img(A)
-    utils.create_elipse_mask(((NoI-1)/2., (NoI-1)/2.), (NoI-1)/2.-5, (NoI-1)/2.-20, sup)
+    utils.create_elipse_mask(((NoI-1)/2., (NoI-1)/2.), (NoI-1)/2., (NoI-1)/2., sup)
 
     tr_hil = img.copy()
-    hilbert_filter(tr_hil)
+    freq_hilbert_filter(tr_hil)
 
     known = img.copy()
     known_mask = utils.zero_img(A)
-    known_mask[:, NoI/2-2:NoI/2+2] = 1
+    known_mask[:, NoI/2-5:NoI/2+7] = 1
     known_mask[roi != 1] = 0
     known[known_mask != 1] = 0
 
     global viewer
-    viewer = utils.IterViewer(img, proj, roi, A, clim=(0.3, 0.45))
+    viewer = utils.IterViewer(img, proj, roi, A, clim=(0.45, 0.55))
+    #viewer = utils.IterLogger(img, proj, roi, A, no_forward=True)
 
-    dbp_pocs_reconstruction(A, proj, roi, known, known_mask, sup)
+    dbp_pocs_reconstruction(bigA, proj, roi, known, known_mask, sup, niter=2000)
 
 if __name__ == '__main__':
     main()

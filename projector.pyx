@@ -92,7 +92,8 @@ class Projector(object):
 
     def update_detectors_length(self, length):
         self.detectors_length = float(length)
-        self.dr = self.detectors_length / self.NoD
+        self.dr = self.detectors_length / (self.NoD - 1)
+        self.backward_signal_scale = self.detectors_length / self.NoD
 
     def update_center_x(self, x):
         self.center_x = x
@@ -116,6 +117,9 @@ class Projector(object):
     def backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img):
         assert self.is_valid_dimension(img, proj)
         self._projection(proj, img, True)
+        img *= self.backward_signal_scale
+        img /= 2 * self.NoA
+
         #img[:, :] = skimage.filters.gaussian(img, 0.8)
 
 

@@ -234,7 +234,7 @@ def normalizedHU(hu):
 
 
 class IterLogger(object):
-    def __init__(self, xtr, ytr, xmask, A, subname=""):
+    def __init__(self, xtr, ytr, xmask, A, subname="", no_forward=False):
         self.xtr = xtr
         self.ytr = ytr
         self.xmask = xmask
@@ -245,6 +245,7 @@ class IterLogger(object):
         self.proj = zero_proj(A)
         self.y_max = numpy.max(numpy.abs(self.ytr))
         self.initialized = False
+        self.no_forward = no_forward
 
         # generate the output directory path and create its directory
         timestamp = str(int(time.time()))
@@ -261,11 +262,12 @@ class IterLogger(object):
         self.log_handler = open(os.path.join(self.dirpath, logname), "w")
         self.initialized = True
 
-    def __call__(self, i, x, y, *argv, **argdict):
+    def __call__(self, i, x, *argv, **argdict):
         if not self.initialized:
             self.initialize()
 
-        self.A.forward(x, self.proj)
+        if not self.no_forward:
+            self.A.forward(x, self.proj)
         xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
         yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)
 
