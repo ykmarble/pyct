@@ -37,10 +37,10 @@ def gen_support(img, center, r):
 
 def main(method):
     #HU_lim = [0, 0.3]
-    HU_lim = [0.4, 0.6]
+    #HU_lim = [0.4, 0.6]
     HU_lim = [0.3, 0.45]
 
-    scale = 0.5
+    scale = 0.55
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -249,8 +249,9 @@ def main(method):
                iter_callback=logger)
 
     if "app.py" == method_id:
-        alpha = 0.08
+        #alpha = 0.08
         #alpha = 0.05
+        alpha = 1
         #def phi_y(y):
         #    y[:, :] = interior_proj
         #method(interior_A, 0.4, alpha, niter,
@@ -279,6 +280,19 @@ def main(method):
                #y=None,
                mu=None,
                iter_callback=logger)
+
+    if "tpv.py" == method_id:
+        p = 0.4
+        v = 0.6
+        ramda = 5e-4
+        eps = 0
+        tau = 0.4
+        sigma = tau
+        eta = 1e-4
+        method(interior_A, interior_proj, p, v, ramda, eps, tau, sigma, eta, niter,
+               iter_callback=viewer
+               )
+
 
 
     ###### begin: metal projection #####

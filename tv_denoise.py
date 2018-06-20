@@ -10,10 +10,10 @@ def grad(img, out_x, out_y):
 
 def div_2(img_x, img_y, out):
     out[:, :] = 0
-    out[:, :-1] += img_x[:, :-1]
-    out[:, 1:] -= img_x[:, :-1]
-    out[:-1] += img_y[:-1]
-    out[1:] -= img_y[:-1]
+    out[:, :-1] -= img_x[:, :-1]
+    out[:, 1:] += img_x[:, :-1]
+    out[:-1] -= img_y[:-1]
+    out[1:] += img_y[:-1]
 
 def tv_denoise_chambolle(img, alpha, max_iter=200, mask=None):
     """

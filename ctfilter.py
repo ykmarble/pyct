@@ -40,8 +40,7 @@ def shepp_logan_filter(proj, sample_rate=1):
     NoA, NoD = proj.shape
     filter_width = NoD + 1 if NoD % 2 == 0 else NoD  # must be a odd number larger than NoD
     filter_x = numpy.linspace(-(filter_width/2), filter_width/2, filter_width)
-    filter_h = 2 / ((math.pi * sample_rate) ** 2 * (1 - 4 * filter_x ** 2))
-    #proj3 = numpy.concatenate((proj[:, -NoD/2-1::-1], proj, proj[:, :NoD/2-1:-1]), axis=1)  # flip and concat `proj`
+    filter_h = 4 / (math.pi * sample_rate**2 * (1 - 4 * filter_x**2))
     proj3 = numpy.concatenate((numpy.zeros((NoA, NoD/2)), proj, numpy.zeros((NoA, NoD/2))), axis=1)  # padding 0
     for i in xrange(NoA):
         proj[i] = numpy.convolve(filter_h, proj3[i], "valid")
