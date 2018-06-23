@@ -3,7 +3,9 @@
 
 import utils
 import numpy
+import skimage
 from math import sin, cos, pi
+
 
 def build_chord_encoder(origin, theta=0, flip_y=False):
     orig_x, orig_y = origin
@@ -101,8 +103,13 @@ def modSheppLoganPhantom(NoSP=256):
 
 
 def main():
-    phantom = modSheppLoganPhantom()
-    utils.save_rawimage(phantom, "modSheppLoganPhantom.dat")
+    output_length = 256
+    oversample_scale = 2.5
+
+    oversampled_phantom = SheppLoganPhantom(int(output_length * oversample_scale))
+    phantom = skimage.transform.resize(oversampled_phantom, (output_length, output_length))
+
+    utils.save_rawimage(phantom, "SheppLoganPhantom.dat")
 
 if __name__ == '__main__':
     main()
