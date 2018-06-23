@@ -46,7 +46,7 @@ matrix_coeff(const int ny, const int nx, const int nt, const int nr, const doubl
 
     ssize_t nrow = 0, nrow_prev = 0;
     const double dtheta = M_PI / nt;
-    const double cx = (nx - 1) / 2, cy = (ny - 1) / 2, cr = (nr - 1) / 2;
+    const double cx = (nx - 1) / 2., cy = (ny - 1) / 2., cr = (nr - 1) / 2.;
     for (int ti = 0; ti < nt; ++ti) {
         const double th = ti * dtheta;
         const double sin_th = std::sin(th);
@@ -65,7 +65,7 @@ matrix_coeff(const int ny, const int nx, const int nt, const int nr, const doubl
                     const double p = pi - cp;
                     const double ray = -(sin_cos * p + r * inv_cos_th) + cy;
                     const int xi = pi;
-                    const int xip = pi + 1;
+                    const int xip = pi;
                     const int yi = (int)std::floor(ray);
                     const int yip = yi + 1;
                     const double a = (yip - ray) * std::abs(inv_cos_th);
@@ -78,7 +78,7 @@ matrix_coeff(const int ny, const int nx, const int nt, const int nr, const doubl
                     const int xi = (int)std::floor(ray);
                     const int xip = xi + 1;
                     const int yi = pi;
-                    const int yip = yi + 1;
+                    const int yip = yi;
                     const double a = (xip - ray) * std::abs(inv_sin_th);
                     const double ap = (ray - xi) * std::abs(inv_sin_th);
                     nrow = add_element(xi, yi, a, nrow);

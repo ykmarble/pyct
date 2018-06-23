@@ -2,7 +2,8 @@
 
 import numpy
 import utils
-import projector
+import cProjector
+import ctfilter
 import sys
 
 def main():
@@ -34,10 +35,16 @@ def main():
         return
     NoI = img.shape[0]
     NoD = NoA = NoI
-    proj = numpy.empty((NoA, NoD))
-    A = projector.Projector(NoI, NoA, NoD)
-    A.forward(img, proj)
-    utils.show_image(proj)
+    print "gen sysmat"
+    A = cProjector.sysmat(NoI, NoI, NoA, NoD)
+    print "forwardp"
+    proj = A * img.reshape(-1)
+    print "filtering"
+    ctfilter.shepp_logan_filter(proj.reshape(NoA, NoD))
+    utils.show_image(proj.reshape(NoA, NoD))
+    print "backwordp"
+    rproj = A.transpose() * proj
+    utils.show_image(rproj.reshape(NoI, NoI))
     #utils.save_rawimage(proj, "proj.dat")
 
 if __name__ == "__main__":
