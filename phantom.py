@@ -101,15 +101,24 @@ def modSheppLoganPhantom(NoSP=256):
 
     return canvas
 
+def simplePhantom(NoSP=256):
+    canvas = numpy.zeros((NoSP, NoSP))
+    scale = (NoSP - 1) / 2.
+
+    draw_elipse(canvas, 0.5, (0 * scale, 0 * scale), (0.8 * scale, 0.8 * scale), 0)
+    draw_elipse(canvas, 0.2, (0.3 * scale, 0.3 * scale), (0.08 * scale, 0.08 * scale), 0)
+    draw_elipse(canvas, 0.2, (-0.3 * scale, 0 * scale), (0.1 * scale, 0.1 * scale), 0)
+
+    return canvas
 
 def main():
     output_length = 256
     oversample_scale = 2.5
 
-    oversampled_phantom = SheppLoganPhantom(int(output_length * oversample_scale))
+    oversampled_phantom = simplePhantom(int(output_length * oversample_scale))
     phantom = skimage.transform.resize(oversampled_phantom, (output_length, output_length))
 
-    utils.save_rawimage(phantom, "SheppLoganPhantom.dat")
+    utils.save_rawimage(phantom, "SimplePhantom.dat")
 
 if __name__ == '__main__':
     main()

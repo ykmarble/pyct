@@ -36,7 +36,7 @@ def main():
     NoI = img.shape[0]
     NoD = NoA = NoI
     print "gen sysmat"
-    A = cProjector.sysmat(NoI, NoI, NoA, NoD)
+    A = cProjector.sysmat_dd(NoI, NoA, NoD, NoD*1)
     print "forwardp"
     proj = A * img.reshape(-1)
     print "filtering"
@@ -44,6 +44,8 @@ def main():
     utils.show_image(proj.reshape(NoA, NoD))
     print "backwordp"
     rproj = A.transpose() * proj
+    rproj /= 4 * NoA
+    print numpy.min(rproj), numpy.max(rproj)
     utils.show_image(rproj.reshape(NoI, NoI))
     #utils.save_rawimage(proj, "proj.dat")
 

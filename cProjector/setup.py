@@ -25,9 +25,10 @@ class get_pybind_include(object):
 ext_modules = [
     Extension(
         'sysmat_cpp',
-        ['src/sysmat.cpp'],
+        ['src/sysmat.cpp', 'src/projectorImplDD.cpp'],
         include_dirs=[
             # Path to pybind11 headers
+            '/usr/local/include/eigen3',
             get_pybind_include(),
             get_pybind_include(user=True)
         ],

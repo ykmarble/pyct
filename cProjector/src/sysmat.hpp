@@ -5,6 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+
 template <class Vector>
 pybind11::array_t<typename Vector::value_type> pyarray_from_vector(Vector& v)
 {
@@ -16,11 +17,12 @@ pybind11::array_t<typename Vector::value_type> pyarray_from_vector(Vector& v)
                                                           tmp->data(), capsule);
 }
 
+
 template <class datatype>
 std::tuple<pybind11::array_t<datatype>,  // data
            pybind11::array_t<ssize_t>,   // indices
            pybind11::array_t<ssize_t>>   // indptr
-matrix_coeff(const int ny, const int nx, const int nt, const int nr, const double dr)
+matrix_coeff_rd(const int ny, const int nx, const int nt, const int nr, const double dr)
 {
     static_assert(std::is_floating_point<datatype>::value,
                   "datatype must be floating point");
