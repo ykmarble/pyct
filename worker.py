@@ -39,7 +39,7 @@ def gen_support(img, center, r):
 def main(method):
     #HU_lim = [0, 0.3]
     HU_lim = [0.45, 0.55]
-    HU_lim = [0.3, 0.45]
+    #HU_lim = [0.3, 0.45]
 
     scale = 0.55
 
