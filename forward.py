@@ -36,17 +36,19 @@ def main():
     NoI = img.shape[0]
     NoD = NoA = NoI
     print "gen sysmat"
-    A = cProjector.sysmat_dd(NoI, NoA, NoD, NoD*0.5)
+    A = cProjector.Projector(256, 256, 256)
+    A.update_detectors_length(256 * 1)
     print "forwardp"
-    proj = A * img.reshape(-1)
+    proj = utils.zero_proj(A)
+    A.forward(img, proj)
     print "filtering"
-    ctfilter.shepp_logan_filter(proj.reshape(NoA, NoD))
-    utils.show_image(proj.reshape(NoA, NoD))
+    ctfilter.shepp_logan_filter(proj)
+    utils.show_image(proj)
     print "backwordp"
-    rproj = A.transpose() * proj
-    rproj /= 4 * NoA
+    rproj = utils.zero_img(A)
+    A.backward(proj, rproj)
     print numpy.min(rproj), numpy.max(rproj)
-    utils.show_image(rproj.reshape(NoI, NoI))
+    utils.show_image(rproj)
     #utils.save_rawimage(proj, "proj.dat")
 
 if __name__ == "__main__":

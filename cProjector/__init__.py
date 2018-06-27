@@ -1,15 +1,14 @@
-from .sysmat_cpp import sysmat_data_d, sysmat_data
+from .sysmat_cpp import sysmat_data_joseph, sysmat_data_dd
 from scipy.sparse import csr_matrix
 import math
 
 
-def sysmat_rd(ny, nx, nt, nr, dr=1.):
-    data,indices,indptr = sysmat_data_d(ny, nx, nt, nr, dr)
-    return csr_matrix((data, indices, indptr), shape=(nt*nr, ny*nx))
+def sysmat_joseph(nx, nth, nr, detectors_length):
+    return sysmat_data_joseph(nx, nth, nr, detectors_length)
 
 
 def sysmat_dd(nx, nth, nr, detectors_length):
-    return sysmat_data(nx, nth, nr, detectors_length)
+    return sysmat_data_dd(nx, nth, nr, detectors_length)
 
 
 class Projector(object):
@@ -39,6 +38,7 @@ class Projector(object):
 
         self.sysmat = None
         self.sysmatT = None
+        #self.sysmat_builder = sysmat_joseph
         self.sysmat_builder = sysmat_dd
 
     def get_image_shape(self):
@@ -94,7 +94,7 @@ class Projector(object):
         assert self.is_valid_dimension(img, proj)
         self._fit_sysmat()
         img[:] = (self.sysmatT * proj.reshape(-1)).reshape(self.NoI, self.NoI)
-        img /= 4 * self.NoA
+        img /= 2 * self.NoA
 
     def partial_forward(self, img, proj, th_indexes, r_indexes):
         raise NotImplementedError

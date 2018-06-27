@@ -5,12 +5,18 @@
 
 using CSRMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;
 
-CSRMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double detectors_length)
+CSRMat buildMatrixWithDistanceMethod(
+    const size_t nx,
+    const size_t nth,
+    const size_t nr,
+    const double detectors_length)
 {
+    std::cout << "Generate system matrix with distance-driven method." << std::endl;
     std::vector< Eigen::Triplet<double> > elements;
-    elements.reserve(nth * nx * nx * 2);
+    elements.reserve(nth * nr * nx * 2);
 
-    auto add_element = [nx, nr, &elements](int xidx, int yidx, int thidx, int ridx, double value) {
+    auto add_element = [nx, nr, &elements](const int xidx, const int yidx, const int thidx,
+                                           const int ridx, const double value) {
         if (0 <= ridx && ridx < nr) {
             const int row = thidx * nr + ridx;
             const int col = yidx * nx + xidx;
@@ -37,8 +43,6 @@ CSRMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double de
             for (int xi = 0; xi < nx; ++xi) {
                 const double pc = (costh * (xi + 0.5 - cx) + sinth * (cx - yi - 0.5)) / dr + cr;
 
-                //const double lb = std::min({p1, p2, p3, p4});
-                //const double hb = std::max({p1, p2, p3, p4});
                 const double lb = pc - 0.7071067811865476 / dr;
                 const double hb = pc + 0.7071067811865476 / dr;
                 //const double lb = pc - 0.9 / dr;
@@ -49,7 +53,7 @@ CSRMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double de
                 const double ah = hb - std::floor(hb);
                 const int rih = std::floor(hb);
 
-                const double scale = dr;
+                const double scale = dr / 1.4142135623730951;
 
                 if (ril == rih) {  // projected pixel within a detector's boundary
                     add_element(xi, yi, thi, rih, (hb - lb) * scale);
