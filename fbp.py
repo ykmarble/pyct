@@ -7,6 +7,7 @@ import utils
 
 def fbp(A, data, recon):
     ctfilter.shepp_logan_filter(data)
+    utils.show_image(data)
     A.backward(data, recon)
 
 if __name__ == '__main__':

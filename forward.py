@@ -36,7 +36,7 @@ def main():
     NoI = img.shape[0]
     NoD = NoA = NoI
     print "gen sysmat"
-    A = cProjector.sysmat_dd(NoI, NoA, NoD, NoD*1)
+    A = cProjector.sysmat_dd(NoI, NoA, NoD, NoD*0.5)
     print "forwardp"
     proj = A * img.reshape(-1)
     print "filtering"

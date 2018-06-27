@@ -164,7 +164,7 @@ def draw_graph(data, canvas):
         canvas[h, i] = 0
     return d_mini, d_maxi
 
-def create_sinogram(img, NoA, NoD, scale=1, sample_scale=8, projector=projector.Projector):
+def create_sinogram(img, NoA, NoD, scale=1, sample_scale=1, projector=projector.Projector):
     """
     Generate sinogram from `img`.
     @img: cross sectional image

@@ -35,16 +35,14 @@ CSRMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double de
         const double sinth = std::sin(th);
         for (int yi = 0; yi < nx; ++yi) {
             for (int xi = 0; xi < nx; ++xi) {
-                const double p1 = (costh * (xi + 0 - cx) + sinth * (cx - yi - 0)) / dr + cr;
-                const double p2 = (costh * (xi + 1 - cx) + sinth * (cx - yi - 0)) / dr + cr;
-                const double p3 = (costh * (xi + 0 - cx) + sinth * (cx - yi - 1)) / dr + cr;
-                const double p4 = (costh * (xi + 1 - cx) + sinth * (cx - yi - 1)) / dr + cr;
                 const double pc = (costh * (xi + 0.5 - cx) + sinth * (cx - yi - 0.5)) / dr + cr;
 
                 //const double lb = std::min({p1, p2, p3, p4});
                 //const double hb = std::max({p1, p2, p3, p4});
                 const double lb = pc - 0.7071067811865476 / dr;
                 const double hb = pc + 0.7071067811865476 / dr;
+                //const double lb = pc - 0.9 / dr;
+                //const double hb = pc + 0.9 / dr;
 
                 const double al = std::floor(lb+1) - lb;
                 const int ril = std::floor(lb);
