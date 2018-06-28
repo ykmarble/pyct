@@ -45,6 +45,15 @@ def main():
     A.backward(proj, rproj)
     utils.show_image(rproj)
     #utils.save_rawimage(proj, "proj.dat")
+    import time
+    t1 = time.time()
+    A.forward(img, proj)
+    t2 = time.time()
+    A.backward(proj, rproj)
+    t3 = time.time()
+    print "f", t2 - t1
+    print "b", t3 - t2
+    print A.sysmat.dtype
 
 if __name__ == "__main__":
     main()

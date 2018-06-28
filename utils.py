@@ -9,6 +9,8 @@ import cv2
 import time
 from math import sqrt, atan2, pi
 
+DTYPE_t = numpy.float32
+
 def decompose_path(path):
     """
     Decompose path into 3 elements, dirname, filename witout extention, extention
@@ -29,7 +31,7 @@ def load_rawimage(path):
             return None
         width = header[2]
         height = header[3]
-        img = numpy.array(struct.unpack("{}f".format(width*height), f.read()))
+        img = numpy.array(struct.unpack("{}f".format(width*height), f.read()), dtype=DTYPE_t)
     img.resize(height, width)
     return img
 
@@ -71,7 +73,7 @@ def show_image(img, clim=None, output_path="saved_img.dat", caption="ctpy"):
 
 def convert_to_polar(img, polar_img):
     Nth, Nr = img.shape
-    polar_img = numpy.zeros((Nr, Nr))
+    polar_img = numpy.zeros((Nr, Nr), dtype=DTYPE_t)
     pc = Nr / 2.
     rc = Nr / 2.
     for pyi in xrange(Nr):
@@ -142,16 +144,16 @@ def create_elipse_mask(center, a, b, out, value=1):
     crop_elipse(out, center, a, b, value)
 
 def empty_img(A):
-    return numpy.empty(A.get_image_shape())
+    return numpy.empty(A.get_image_shape(), dtype=DTYPE_t)
 
 def empty_proj(A):
-    return numpy.empty(A.get_projector_shape())
+    return numpy.empty(A.get_projector_shape(), dtype=DTYPE_t)
 
 def zero_img(A):
-    return numpy.zeros(A.get_image_shape())
+    return numpy.zeros(A.get_image_shape(), dtype=DTYPE_t)
 
 def zero_proj(A):
-    return numpy.zeros(A.get_projector_shape())
+    return numpy.zeros(A.get_projector_shape(), dtype=DTYPE_t)
 
 def draw_graph(data, canvas):
     d_mini, d_maxi = numpy.min(data), numpy.max(data)
@@ -182,7 +184,7 @@ def create_sinogram(img, NoA, NoD, scale=1, sample_scale=1, projector=projector.
     A.update_detectors_length(NoI*scale)
     over_proj = zero_proj(A)
     A.forward(img, over_proj)
-    proj = numpy.zeros((NoA, NoD))
+    proj = numpy.zeros((NoA, NoD), dtype=DTYPE_t)
     for i in xrange(NoD):
         proj[:, i] = numpy.sum(over_proj[:, i*sample_scale:(i+1)*sample_scale], axis=1)
     proj /= sample_scale
@@ -195,7 +197,7 @@ def interpolate(n1, n2, l):
     @n2: last value of interpolation
     @l: length of sample points
     """
-    x = numpy.zeros(l)
+    x = numpy.zeros(l, dtype=DTYPE_t)
     x += n1 * numpy.cos(numpy.linspace(0, numpy.pi/2., l))**2
     x += n2 * numpy.sin(numpy.linspace(0, numpy.pi/2., l))**2
     return x

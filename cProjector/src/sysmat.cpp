@@ -2,15 +2,20 @@
 #include <pybind11/eigen.h>
 #include <Eigen/Sparse>
 
-using CSRMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;
-using CSCMat = Eigen::SparseMatrix<double, Eigen::ColMajor>;
+#include "projectorImplJoseph.hpp"
+#include "projectorImplDD.hpp"
 
-CSRMat buildMatrixWithJosephMethod(size_t nx, size_t nth, size_t nr, double detectors_length);
-CSCMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double detectors_length);
+namespace {
+    template <typename T>
+    using CSRMat = Eigen::SparseMatrix<T, Eigen::RowMajor>;
+
+    template <typename T>
+    using CSCMat = Eigen::SparseMatrix<T, Eigen::ColMajor>;
+}
 
 namespace py = pybind11;
 PYBIND11_MODULE(sysmat_cpp, m)
 {
-    m.def("sysmat_data_joseph", &buildMatrixWithJosephMethod, "");
-    m.def("sysmat_data_dd", &buildMatrixWithDistanceMethod, "");
+    m.def("sysmat_data_joseph", &buildMatrixWithJosephMethod<float>, "");
+    m.def("sysmat_data_dd", &buildMatrixWithDistanceMethod<float>, "");
 }

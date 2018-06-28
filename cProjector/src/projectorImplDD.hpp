@@ -4,22 +4,26 @@
 #include <thread>
 #include <Eigen/Sparse>
 
-using CSCMat = Eigen::SparseMatrix<double, Eigen::ColMajor>;
+namespace {
+    template <typename T>
+    using CSCMat = Eigen::SparseMatrix<T, Eigen::ColMajor>;
+}
 
-CSCMat buildMatrixWithDistanceMethod(
+template <typename T>
+CSCMat<T> buildMatrixWithDistanceMethod(
     const size_t nx,
     const size_t nth,
     const size_t nr,
     const double detectors_length)
 {
-    using CoeffTriplets = std::vector< Eigen::Triplet<double> >;
+    using CoeffTriplets = std::vector< Eigen::Triplet<T> >;
 
     auto add_element = [nx, nr](const int xidx, const int yidx, const int thidx, const int ridx,
                                 const double value, CoeffTriplets& elements) {
         if (0 <= ridx && ridx < nr) {
             const int row = thidx * nr + ridx;
             const int col = yidx * nx + xidx;
-            elements.emplace_back(row, col, value);
+            elements.emplace_back(row, col, static_cast<T>(value));
         }
     };
 
@@ -105,7 +109,7 @@ CSCMat buildMatrixWithDistanceMethod(
     const size_t nrows = nth * nr;
     const size_t ncols = nx * nx;
 
-    CSCMat csc(nrows, ncols);
+    CSCMat<T> csc(nrows, ncols);
     csc.setFromTriplets(elements.begin(), elements.end());
 
     return csc;

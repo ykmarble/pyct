@@ -3,16 +3,21 @@
 #include <vector>
 #include <Eigen/Sparse>
 
-using CSRMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;
+namespace {
+    template <typename T>
+    using CSRMat = Eigen::SparseMatrix<T, Eigen::RowMajor>;
+}
 
-CSRMat buildMatrixWithJosephMethod(
+
+template <typename T>
+CSRMat<T> buildMatrixWithJosephMethod(
     const size_t nx,
     const size_t nt,
     const size_t nr,
     const double detectors_length)
 {
     std::cout << "Generate system matrix with Joseph method." << std::endl;
-    std::vector< Eigen::Triplet<double> > elements;
+    std::vector< Eigen::Triplet<T> > elements;
     elements.reserve(nt * nr * nx * 2);
 
     auto add_element = [nx, nr, &elements](const int xidx, const int yidx, const int tidx,
@@ -20,7 +25,7 @@ CSRMat buildMatrixWithJosephMethod(
         if (0 <= xidx && xidx < nx && 0 <= yidx && yidx < nx) {
             const int row = tidx * nr + ridx;
             const int col = yidx * nx + xidx;
-            elements.emplace_back(row, col, value);
+            elements.emplace_back(row, col, static_cast<T>(value));
         }
     };
 
@@ -69,7 +74,7 @@ CSRMat buildMatrixWithJosephMethod(
             }
         }
     }
-    CSRMat csr(nt*nr, nx*nx);
+    CSRMat<T> csr(nt*nr, nx*nx);
     csr.setFromTriplets(elements.begin(), elements.end());
     csr.makeCompressed();
     return csr;
