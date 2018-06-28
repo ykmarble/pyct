@@ -3,7 +3,7 @@
 
 from worker import main
 import utils
-import projector
+import cProjector
 import differencial
 import numpy
 
@@ -44,9 +44,10 @@ def diff_calc_scale(A, subsets):
 def calc_scale(A, subsets):
     if isinstance(A, differencial.Projector):
         print "use diff_calc_scale"
+        raise NotImplementedError()
         return diff_calc_scale(A, subsets)
 
-    if not isinstance(A, projector.Projector):
+    if not isinstance(A, cProjector.Projector):
         raise NotImplementedError("unknown projector matrix")
 
     # 吸収版｡
@@ -84,16 +85,26 @@ def make_subset(NoA, n_subset, shuffled=False):
         numpy.random.shuffle(index2d)
     return index2d
 
-
+debug_first = True
+import time
 def os_sart_mainloop(A, data, recon, alpha, a_ip, a_pj_subset, subsets, i, img, proj):
+    global debug_first
     i_subset = i % len(subsets)
     cur_subset = subsets[i_subset]
+    t1 = time.time()
     A.partial_forward(recon, proj, cur_subset, None)
+    t2 = time.time()
     proj -= data
     proj /= -a_ip
+    t3 = time.time()
     A.partial_backward(proj, img, cur_subset, None)
+    t4 = time.time()
     img /= a_pj_subset[i_subset]
     recon += alpha * img
+    if debug_first:
+        debug_first = False
+        print "f", t2 - t1
+        print "b", t4 - t3
 
 
 def os_sart(A, b, alpha=0.9, nsubset=10, niter=1000, x=None, iter_callback=lambda *x: None):

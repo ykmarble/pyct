@@ -42,6 +42,7 @@ def main(method):
     #HU_lim = [0.3, 0.45]
 
     scale = 0.55
+    scale = 1
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"

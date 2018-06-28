@@ -1,4 +1,5 @@
 from .sysmat_cpp import sysmat_data_joseph, sysmat_data_dd
+import numpy
 import math
 
 
@@ -96,34 +97,46 @@ class Projector(object):
         img /= 2 * self.NoA
 
     def partial_forward(self, img, proj, th_indexes, r_indexes):
-        raise NotImplementedError
         assert self.is_valid_dimension(img, proj)
         if th_indexes is not None:
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
         if r_indexes is not None:
-            assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self._projection(img, proj, False, th_indexes=th_indexes, r_indexes=r_indexes)
+            raise NotImplementedError
+
+        if th_indexes is None:
+            th_indexes = range(self.NoA)
+        r_indexes = range(self.NoD)
+
+        self._fit_sysmat()
+        rows = self._row_array_from_th_r(th_indexes, r_indexes)  # 25 us (including the avobe procs)
+        #ps = self.sysmat[rows]  # 36600 us
+        #pp = proj[th_indexes]   # 6 us
+        #pp = (ps * img.reshape(-1)).reshape(th_indexes.size, self.NoD)  # 4215 us
+        proj[th_indexes] = (self.sysmat[rows] * img.reshape(-1)).reshape(th_indexes.size, self.NoD)
 
     def partial_backward(self, proj, img, th_indexes, r_indexes):
-        raise NotImplementedError
         assert self.is_valid_dimension(img, proj)
         if th_indexes is not None:
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
         if r_indexes is not None:
-            assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self._projection(proj, img, True, th_indexes=th_indexes, r_indexes=r_indexes)
+            raise NotImplementedError
 
-    def forward_with_mask(self, img, proj, mask):
-        raise NotImplementedError
-        assert self.is_valid_dimension(img, proj)
-        self._projection(img, proj, False, mask)
+        if th_indexes is None:
+            th_indexes = range(self.NoA)
+        r_indexes = range(self.NoD)
 
-    def backward_with_mask(self, proj, img, mask):
-        raise NotImplementedError
-        assert self.is_valid_dimension(img, proj)
-        self._projection(proj, img, True, mask)
+        self._fit_sysmat()
+        rows = self._row_array_from_th_r(th_indexes, r_indexes)  # 25 us (including the avobe procs)
+        #ps = self.sysmatT[:, rows]   # 36600 us
+        #pp = proj.reshape(-1)[rows]  # 13 us
+        #img[:] = (ps * pp).reshape(self.NoI, self.NoI)  # 5537 us
+        img[:] = (self.sysmatT[:, rows] * proj.reshape(-1)[rows]).reshape(self.NoI, self.NoI)
+        img /= 2 * self.NoA
 
     def _fit_sysmat(self):
         if self.sysmat is None:
             self.sysmat = self.sysmat_builder(self.NoI, self.NoA, self.NoD, self.detectors_length)
             self.sysmatT = self.sysmat.transpose()
+
+    def _row_array_from_th_r(self, thidxs, ridxs):
+        return ((thidxs * self.NoD)[None].T + ridxs).reshape(-1)

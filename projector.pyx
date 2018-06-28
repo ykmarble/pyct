@@ -145,18 +145,6 @@ class Projector(object):
         self._projection(proj, img, True, th_indexes=th_indexes, r_indexes=r_indexes)
         #img[:, :] = skimage.filters.gaussian(img, 0.8)
 
-    def forward_with_mask(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
-                          numpy.ndarray[numpy.int_t, ndim=2] mask):
-        assert self.is_valid_dimension(img, proj)
-        self._projection(img, proj, False, mask)
-        #ctfilter.fir_gauss_1d(proj)
-
-    def backward_with_mask(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
-                          numpy.ndarray[numpy.int_t, ndim=2] mask):
-        assert self.is_valid_dimension(img, proj)
-        self._projection(proj, img, True, mask)
-        #img[:, :] = skimage.filters.gaussian(img, 0.8)
-
     @cython.boundscheck(False)
     def _projection(self, numpy.ndarray[DTYPE_t, ndim=2] src, numpy.ndarray[DTYPE_t, ndim=2] dst, int backward,
                     numpy.ndarray[numpy.int_t, ndim=2] mask=None,
