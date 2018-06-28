@@ -8,9 +8,6 @@
 namespace {
     template <typename T>
     using CSRMat = Eigen::SparseMatrix<T, Eigen::RowMajor>;
-
-    template <typename T>
-    using CSCMat = Eigen::SparseMatrix<T, Eigen::ColMajor>;
 }
 
 namespace py = pybind11;

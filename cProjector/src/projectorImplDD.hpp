@@ -6,11 +6,11 @@
 
 namespace {
     template <typename T>
-    using CSCMat = Eigen::SparseMatrix<T, Eigen::ColMajor>;
+    using CSRMat = Eigen::SparseMatrix<T, Eigen::RowMajor>;
 }
 
 template <typename T>
-CSCMat<T> buildMatrixWithDistanceMethod(
+CSRMat<T> buildMatrixWithDistanceMethod(
     const size_t nx,
     const size_t nth,
     const size_t nr,
@@ -39,12 +39,12 @@ CSCMat<T> buildMatrixWithDistanceMethod(
     const double dr = detectors_length / nr;
     const double cr = nr / 2.;  // devide by dr to calc correct cr
 
-    auto calc_coeff_thi = [nx, cx, dth, dr, cr, &add_element](const int thi, CoeffTriplets& out) {
-        const double th = thi * dth;
-        const double costh = std::cos(th);
-        const double sinth = std::sin(th);
-        for (int yi = 0; yi < nx; ++yi) {
-            for (int xi = 0; xi < nx; ++xi) {
+    auto calc_coeff_yi = [nx, nth, cx, dth, dr, cr, &add_element](const int yi, CoeffTriplets& out) {
+        for (int xi = 0; xi < nx; ++xi) {
+            for (int thi = 0; thi < nth; ++thi) {
+                const double th = thi * dth;
+                const double costh = std::cos(th);
+                const double sinth = std::sin(th);
                 const double pc = (costh * (xi + 0.5 - cx) + sinth * (cx - yi - 0.5)) / dr + cr;
 
                 const double lb = pc - 0.7071067811865476 / dr;
@@ -75,10 +75,10 @@ CSCMat<T> buildMatrixWithDistanceMethod(
     };
 
     const size_t nthread = std::thread::hardware_concurrency();
-    const size_t stride = (nth - 1) / nthread + 1;
-    auto work = [calc_coeff_thi](int start, int end, CoeffTriplets &elements) {
-                    for (int thi = start; thi < end; ++thi)
-                        calc_coeff_thi(thi, elements);
+    const size_t stride = (nx - 1) / nthread + 1;
+    auto work = [calc_coeff_yi](int start, int end, CoeffTriplets &elements) {
+                    for (int yi = start; yi < end; ++yi)
+                        calc_coeff_yi(yi, elements);
                     elements.shrink_to_fit();
                 };
 
@@ -109,8 +109,8 @@ CSCMat<T> buildMatrixWithDistanceMethod(
     const size_t nrows = nth * nr;
     const size_t ncols = nx * nx;
 
-    CSCMat<T> csc(nrows, ncols);
-    csc.setFromTriplets(elements.begin(), elements.end());
+    CSRMat<T> csr(nrows, ncols);
+    csr.setFromTriplets(elements.begin(), elements.end());
 
-    return csc;
+    return csr;
 }
