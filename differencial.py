@@ -26,17 +26,13 @@ class Projector(projector.Projector):
         self.t_rdiff(proj, self.last_proj)
         super(self.__class__, self).backward(self.last_proj, img)
 
-    def partial_forward(self, img, proj, th_indexes, r_indexes):
-        if r_indexes is not None:
-            raise NotImplementedError("Not yet implemented partial `r_indexes` projection.")
-        super(self.__class__, self).partial_forward(img, self.last_proj, th_indexes, r_indexes)
+    def partial_forward(self, img, proj, th_indexes):
+        super(self.__class__, self).partial_forward(img, self.last_proj, th_indexes)
         self.rdiff(self.last_proj, proj)
 
-    def partial_backward(self, proj, img, th_indexes, r_indexes):
-        if r_indexes is not None:
-            raise NotImplementedError("Not yet implemented partial `r_indexes` projection.")
+    def partial_backward(self, proj, img, th_indexes):
         self.t_rdiff(proj, self.last_proj)
-        super(self.__class__, self).partial_backward(self.last_proj, img, th_indexes, r_indexes)
+        super(self.__class__, self).partial_backward(self.last_proj, img, th_indexes)
 
     def rdiff(self, proj, diff_proj):
         diff_proj[:, :-1] = proj[:, 1:] - proj[:, :-1]

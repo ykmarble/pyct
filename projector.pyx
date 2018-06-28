@@ -122,27 +122,20 @@ class Projector(object):
 
         #img[:, :] = skimage.filters.gaussian(img, 0.8)
 
-
     def partial_forward(self, numpy.ndarray[DTYPE_t, ndim=2] img, numpy.ndarray[DTYPE_t, ndim=2] proj,
-                        numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
-                        numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
+                        numpy.ndarray[numpy.int_t, ndim=1] th_indexes):
         assert self.is_valid_dimension(img, proj)
         if th_indexes is not None:
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
-        if r_indexes is not None:
-            assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self._projection(img, proj, False, th_indexes=th_indexes, r_indexes=r_indexes)
+        self._projection(img, proj, False, th_indexes=th_indexes, r_indexes=None)
         #ctfilter.fir_gauss_1d(proj)
 
     def partial_backward(self, numpy.ndarray[DTYPE_t, ndim=2] proj, numpy.ndarray[DTYPE_t, ndim=2] img,
-                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes,
-                         numpy.ndarray[numpy.int_t, ndim=1] r_indexes):
+                         numpy.ndarray[numpy.int_t, ndim=1] th_indexes):
         assert self.is_valid_dimension(img, proj)
         if th_indexes is not None:
             assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
-        if r_indexes is not None:
-            assert 0 <= numpy.min(r_indexes) and numpy.max(r_indexes) < self.NoD
-        self._projection(proj, img, True, th_indexes=th_indexes, r_indexes=r_indexes)
+        self._projection(proj, img, True, th_indexes=th_indexes, r_indexes=None)
         #img[:, :] = skimage.filters.gaussian(img, 0.8)
 
     @cython.boundscheck(False)

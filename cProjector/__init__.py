@@ -36,8 +36,11 @@ class Projector(object):
         self.update_detectors_length(self.NoI)
         self.dtheta = math.pi / self.NoA
 
+        self.sysmat_need_update = True
         self.sysmat = None
         self.sysmatT = None
+        self.partial_sysmat = {}
+        self.partial_sysmatT = {}
         #self.sysmat_builder = sysmat_joseph
         self.sysmat_builder = sysmat_dd
 
@@ -70,8 +73,7 @@ class Projector(object):
     def update_detectors_length(self, length):
         self.detectors_length = float(length)
         self.dr = self.detectors_length / self.NoD
-        self.sysmat = None
-        self.sysmatT = None
+        self.sysmat_need_update = True
 
     def update_center_x(self, x):
         raise NotImplementedError
@@ -96,47 +98,40 @@ class Projector(object):
         img[:] = (self.sysmatT * proj.reshape(-1)).reshape(self.NoI, self.NoI)
         img /= 2 * self.NoA
 
-    def partial_forward(self, img, proj, th_indexes, r_indexes):
+    def partial_forward(self, img, proj, th_indexes):
         assert self.is_valid_dimension(img, proj)
-        if th_indexes is not None:
-            assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
-        if r_indexes is not None:
-            raise NotImplementedError
+        assert th_indexes is not None and 1 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
 
-        if th_indexes is None:
-            th_indexes = range(self.NoA)
-        r_indexes = range(self.NoD)
+        rows = self._row_array_from_th(th_indexes)
+        part_key = th_indexes.tobytes()
 
         self._fit_sysmat()
-        rows = self._row_array_from_th_r(th_indexes, r_indexes)  # 25 us (including the avobe procs)
-        #ps = self.sysmat[rows]  # 36600 us
-        #pp = proj[th_indexes]   # 6 us
-        #pp = (ps * img.reshape(-1)).reshape(th_indexes.size, self.NoD)  # 4215 us
-        proj[th_indexes] = (self.sysmat[rows] * img.reshape(-1)).reshape(th_indexes.size, self.NoD)
+        if not part_key in self.partial_sysmat:
+            self.partial_sysmat[part_key] = self.sysmat[rows]
 
-    def partial_backward(self, proj, img, th_indexes, r_indexes):
+        proj[th_indexes] = (self.partial_sysmat[part_key] * img.reshape(-1)).reshape(th_indexes.size, self.NoD)
+
+    def partial_backward(self, proj, img, th_indexes):
         assert self.is_valid_dimension(img, proj)
-        if th_indexes is not None:
-            assert 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
-        if r_indexes is not None:
-            raise NotImplementedError
+        assert th_indexes is not None and 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
 
-        if th_indexes is None:
-            th_indexes = range(self.NoA)
-        r_indexes = range(self.NoD)
+        rows = self._row_array_from_th(th_indexes)
+        part_key = th_indexes.tobytes()
 
         self._fit_sysmat()
-        rows = self._row_array_from_th_r(th_indexes, r_indexes)  # 25 us (including the avobe procs)
-        #ps = self.sysmatT[:, rows]   # 36600 us
-        #pp = proj.reshape(-1)[rows]  # 13 us
-        #img[:] = (ps * pp).reshape(self.NoI, self.NoI)  # 5537 us
-        img[:] = (self.sysmatT[:, rows] * proj.reshape(-1)[rows]).reshape(self.NoI, self.NoI)
+        if not part_key in self.partial_sysmatT:
+            self.partial_sysmatT[part_key] = self.sysmatT[:, rows]
+
+        img[:] = (self.partial_sysmatT[part_key] * proj.reshape(-1)[rows]).reshape(self.NoI, self.NoI)
         img /= 2 * self.NoA
 
     def _fit_sysmat(self):
-        if self.sysmat is None:
+        if self.sysmat_need_update:
+            self.sysmat_need_update = False
             self.sysmat = self.sysmat_builder(self.NoI, self.NoA, self.NoD, self.detectors_length)
             self.sysmatT = self.sysmat.transpose()
+            self.partial_sysmat = {}
+            self.partial_sysmatT = {}
 
-    def _row_array_from_th_r(self, thidxs, ridxs):
-        return ((thidxs * self.NoD)[None].T + ridxs).reshape(-1)
+    def _row_array_from_th(self, thidxs):
+        return ((thidxs * self.NoD)[None].T + numpy.arange(self.NoA)).reshape(-1)

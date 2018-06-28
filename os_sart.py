@@ -33,8 +33,8 @@ def diff_calc_scale(A, subsets):
     img_u = utils.empty_img(absorpA)
     img_d = utils.empty_img(absorpA)
     for i in xrange(len(subsets)):
-        absorpA.partial_backward(proj_u, img_u, subsets[i], None)
-        absorpA.partial_backward(proj_d, img_d, subsets[i], None)
+        absorpA.partial_backward(proj_u, img_u, subsets[i])
+        absorpA.partial_backward(proj_d, img_d, subsets[i])
         a_pj_subset[i] = img_u + img_d
         a_pj_subset[i][a_pj_subset[i]==0] = 1  # avoid zero-division
 
@@ -44,7 +44,7 @@ def diff_calc_scale(A, subsets):
 def calc_scale(A, subsets):
     if isinstance(A, differencial.Projector):
         print "use diff_calc_scale"
-        raise NotImplementedError()
+        raise NotImplementedError("differencial version is unsupported")
         return diff_calc_scale(A, subsets)
 
     if not isinstance(A, cProjector.Projector):
@@ -61,7 +61,7 @@ def calc_scale(A, subsets):
     proj = utils.zero_proj(A)
     proj[:, :] = 1
     for i in xrange(len(subsets)):
-        A.partial_backward(proj, a_pj_subset[i], subsets[i], None)
+        A.partial_backward(proj, a_pj_subset[i], subsets[i])
         a_pj_subset[i][a_pj_subset[i]==0] = 1  # avoid zero-division
 
     return a_ip, a_pj_subset
@@ -85,27 +85,15 @@ def make_subset(NoA, n_subset, shuffled=False):
         numpy.random.shuffle(index2d)
     return index2d
 
-debug_first = True
-import time
 def os_sart_mainloop(A, data, recon, alpha, a_ip, a_pj_subset, subsets, i, img, proj):
-    global debug_first
     i_subset = i % len(subsets)
     cur_subset = subsets[i_subset]
-    t1 = time.time()
-    A.partial_forward(recon, proj, cur_subset, None)
-    t2 = time.time()
+    A.partial_forward(recon, proj, cur_subset)
     proj -= data
     proj /= -a_ip
-    t3 = time.time()
-    A.partial_backward(proj, img, cur_subset, None)
-    t4 = time.time()
+    A.partial_backward(proj, img, cur_subset)
     img /= a_pj_subset[i_subset]
     recon += alpha * img
-    if debug_first:
-        debug_first = False
-        print "f", t2 - t1
-        print "b", t4 - t3
-
 
 def os_sart(A, b, alpha=0.9, nsubset=10, niter=1000, x=None, iter_callback=lambda *x: None):
     if x is None:
