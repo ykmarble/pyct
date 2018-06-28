@@ -3,8 +3,10 @@
 #include <Eigen/Sparse>
 
 using CSRMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;
+using CSCMat = Eigen::SparseMatrix<double, Eigen::ColMajor>;
+
 CSRMat buildMatrixWithJosephMethod(size_t nx, size_t nth, size_t nr, double detectors_length);
-CSRMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double detectors_length);
+CSCMat buildMatrixWithDistanceMethod(size_t nx, size_t nth, size_t nr, double detectors_length);
 
 namespace py = pybind11;
 PYBIND11_MODULE(sysmat_cpp, m)

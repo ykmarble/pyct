@@ -35,19 +35,14 @@ def main():
         return
     NoI = img.shape[0]
     NoD = NoA = NoI
-    print "gen sysmat"
     A = cProjector.Projector(256, 256, 256)
     A.update_detectors_length(256 * 1)
-    print "forwardp"
     proj = utils.zero_proj(A)
     A.forward(img, proj)
-    print "filtering"
     ctfilter.shepp_logan_filter(proj)
     utils.show_image(proj)
-    print "backwordp"
     rproj = utils.zero_img(A)
     A.backward(proj, rproj)
-    print numpy.min(rproj), numpy.max(rproj)
     utils.show_image(rproj)
     #utils.save_rawimage(proj, "proj.dat")
 

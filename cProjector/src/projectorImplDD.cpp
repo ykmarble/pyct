@@ -2,20 +2,17 @@
 #include <cmath>
 #include <vector>
 #include <thread>
-#include <chrono>
 #include <Eigen/Sparse>
 
-using CSRMat = Eigen::SparseMatrix<double, Eigen::RowMajor>;
+using CSCMat = Eigen::SparseMatrix<double, Eigen::ColMajor>;
 
-CSRMat buildMatrixWithDistanceMethod(
+CSCMat buildMatrixWithDistanceMethod(
     const size_t nx,
     const size_t nth,
     const size_t nr,
     const double detectors_length)
 {
     using CoeffTriplets = std::vector< Eigen::Triplet<double> >;
-    std::cout << "Generate system matrix with distance-driven method." << std::endl;
-    CoeffTriplets elements;
 
     auto add_element = [nx, nr](const int xidx, const int yidx, const int thidx, const int ridx,
                                 const double value, CoeffTriplets& elements) {
@@ -74,7 +71,6 @@ CSRMat buildMatrixWithDistanceMethod(
     };
 
     const size_t nthread = std::thread::hardware_concurrency();
-    std::cout << nthread << std::endl;
     const size_t stride = (nth - 1) / nthread + 1;
     auto work = [calc_coeff_thi](int start, int end, CoeffTriplets &elements) {
                     for (int thi = start; thi < end; ++thi)
@@ -82,7 +78,6 @@ CSRMat buildMatrixWithDistanceMethod(
                     elements.shrink_to_fit();
                 };
 
-    auto t = std::chrono::system_clock::now();
     std::vector<CoeffTriplets> workspace(nthread);
     std::vector<std::thread> workers;
     for (int i = 0; i < nthread; ++i) {
@@ -96,26 +91,22 @@ CSRMat buildMatrixWithDistanceMethod(
     for (auto& w : workers)
         w.join();
 
-    auto t2 = std::chrono::system_clock::now();
-
     auto nonzero_elements = 0;
     for (const auto& w: workspace)
         nonzero_elements += w.size();
 
+    CoeffTriplets elements;
     elements.reserve(nonzero_elements);
 
     for (auto& w : workspace) {
         std::move(w.begin(), w.end(), std::back_inserter(elements));
     }
 
-    auto t3 = std::chrono::system_clock::now();
-    CSRMat csr(nth*nr, nx*nx);
-    csr.setFromTriplets(elements.begin(), elements.end());
-    csr.makeCompressed();
+    const size_t nrows = nth * nr;
+    const size_t ncols = nx * nx;
 
-    auto t4 = std::chrono::system_clock::now();
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t).count() << std::endl;
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count() << std::endl;
-    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count() << std::endl;
-    return csr;
+    CSCMat csc(nrows, ncols);
+    csc.setFromTriplets(elements.begin(), elements.end());
+
+    return csc;
 }

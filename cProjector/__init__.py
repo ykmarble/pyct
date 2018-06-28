@@ -1,7 +1,5 @@
 from .sysmat_cpp import sysmat_data_joseph, sysmat_data_dd
-from scipy.sparse import csr_matrix
 import math
-import time
 
 
 def sysmat_joseph(nx, nth, nr, detectors_length):
@@ -127,7 +125,5 @@ class Projector(object):
 
     def _fit_sysmat(self):
         if self.sysmat is None:
-            t = time.time()
             self.sysmat = self.sysmat_builder(self.NoI, self.NoA, self.NoD, self.detectors_length)
             self.sysmatT = self.sysmat.transpose()
-            print time.time() - t
