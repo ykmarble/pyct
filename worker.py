@@ -41,8 +41,7 @@ def main(method):
     HU_lim = [0.45, 0.55]
     #HU_lim = [0.3, 0.45]
 
-    scale = 0.55
-    scale = 1
+    scale = 0.6
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -54,8 +53,8 @@ def main(method):
 
     img = utils.load_rawimage(path)
     NoI = img.shape[0]
-    NoA = int(NoI)
-    NoD = int(NoI)
+    NoA = int(NoI * 1.2)
+    NoD = int(NoI * 1.2)
 
     # interior projection
     interior_A = Projector(NoI, NoA, NoD)
@@ -97,7 +96,7 @@ def main(method):
     initial_y = interpolate_initial_y(full_proj, ymask, support)
 
     # generate proximal operators
-    tv_alpha = 0.1
+    tv_alpha = 0.05
 
     def prox_tv_all(x):
         x[:, :] = sk_tv(x, 1./tv_alpha)
@@ -111,7 +110,7 @@ def main(method):
         x[x > 1] = 1
 
     known_mask = utils.zero_img(full_A)
-    utils.create_elipse_mask((full_A.center_x+40, full_A.center_y+20), 10, 10, known_mask)
+    utils.create_elipse_mask((full_A.center_x+0, full_A.center_y+0), 8, 60, known_mask)
     known = img.copy()
     known[known_mask != 1] = 0
 
@@ -172,6 +171,8 @@ def main(method):
     niter = 2000
 
     method_id = os.path.basename(sys.argv[0])
+    utils.show_image(interior_proj)
+    utils.show_image(initial_y)
 
     # setup method specific configuration and start calculation
     if "original.py" == method_id:
@@ -185,23 +186,12 @@ def main(method):
         utils.show_image(initial_x*xmask, clim=HU_lim)
 
     if "iterative_fbp.py" == method_id:
-        alpha = 0.5
-        #phi_x = prox_known
+        alpha = 0.9
+        phi_x = prox_known
         method(interior_A, interior_proj, alpha, niter,
                phi_x=lambda x: x,
                G=G_sh,
                x=initial_x,
-               iter_callback=viewer)
-
-    if "estimate_missing_line.py" == method_id:
-        alpha = 0.04
-        phi_x = prox_known
-        method(full_A, full_proj, alpha, niter,
-               phi_x=phi_x,
-               phi_y=phi_y,
-               G=G_sh,
-               x=initial_x,
-               y=initial_y,
                iter_callback=viewer)
 
     if "estimate_missing_line.py" == method_id:
@@ -222,8 +212,8 @@ def main(method):
                iter_callback=viewer)
 
     if "os_sart.py" == method_id:
-        alpha = 1
-        nsubset = 10
+        alpha = 0.8
+        nsubset = 20
         method(interior_A, interior_proj,
                alpha=alpha,
                nsubset=nsubset,
@@ -233,10 +223,10 @@ def main(method):
 
     if "os_sart_tv.py" == method_id:
         os_alpha = 1
-        tv_alpha = 0.9
-        tv_alpha_s = 0.997
-        nsubset = 10
-        ntv = 10
+        tv_alpha = 0.05
+        tv_alpha_s = 0.9997
+        nsubset = 20
+        ntv = 5
         method(interior_A, interior_proj,
                os_alpha=os_alpha,
                tv_alpha=tv_alpha,

@@ -100,7 +100,7 @@ class Projector(object):
 
     def partial_forward(self, img, proj, th_indexes):
         assert self.is_valid_dimension(img, proj)
-        assert th_indexes is not None and 1 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
+        assert th_indexes is not None and 0 <= numpy.min(th_indexes) and numpy.max(th_indexes) < self.NoA
 
         rows = self._row_array_from_th(th_indexes)
         part_key = th_indexes.tobytes()
@@ -108,8 +108,10 @@ class Projector(object):
         self._fit_sysmat()
         if not part_key in self.partial_sysmat:
             self.partial_sysmat[part_key] = self.sysmat[rows]
-
-        proj[th_indexes] = (self.partial_sysmat[part_key] * img.reshape(-1)).reshape(th_indexes.size, self.NoD)
+        try:
+            proj[th_indexes] = (self.partial_sysmat[part_key] * img.reshape(-1)).reshape(th_indexes.size, self.NoD)
+        except:
+            import pdb; pdb.set_trace()
 
     def partial_backward(self, proj, img, th_indexes):
         assert self.is_valid_dimension(img, proj)
@@ -134,4 +136,4 @@ class Projector(object):
             self.partial_sysmatT = {}
 
     def _row_array_from_th(self, thidxs):
-        return ((thidxs * self.NoD)[None].T + numpy.arange(self.NoA)).reshape(-1)
+        return ((thidxs * self.NoD)[None].T + numpy.arange(self.NoD)).reshape(-1)

@@ -35,25 +35,16 @@ def main():
         return
     NoI = img.shape[0]
     NoD = NoA = NoI
-    A = cProjector.Projector(256, 256, 256)
-    A.update_detectors_length(256 * 1)
+    A = cProjector.Projector(NoI, NoA, NoD)
+    A.update_detectors_length(NoI * 0.5)
     proj = utils.zero_proj(A)
     A.forward(img, proj)
-    ctfilter.shepp_logan_filter(proj)
     utils.show_image(proj)
+    ctfilter.shepp_logan_filter(proj)
     rproj = utils.zero_img(A)
     A.backward(proj, rproj)
     utils.show_image(rproj)
     #utils.save_rawimage(proj, "proj.dat")
-    import time
-    t1 = time.time()
-    A.forward(img, proj)
-    t2 = time.time()
-    A.backward(proj, rproj)
-    t3 = time.time()
-    print "f", t2 - t1
-    print "b", t3 - t2
-    print A.sysmat.dtype
 
 if __name__ == "__main__":
     main()

@@ -38,26 +38,28 @@ CSRMat<T> buildMatrixWithDistanceMethod(
     const double dth = M_PI / nth;
     const double dr = detectors_length / nr;
     const double cr = nr / 2.;  // devide by dr to calc correct cr
+    //const double blob_r = 0.7071067811865476;
+    const double blob_r = 1.2;
 
-    auto calc_coeff_yi = [nx, nth, cx, dth, dr, cr, &add_element](const int yi, CoeffTriplets& out) {
+    auto calc_coeff_yi = [nx, nth, cx, dth, dr, cr, blob_r, &add_element](const int yi, CoeffTriplets& out) {
         for (int xi = 0; xi < nx; ++xi) {
             for (int thi = 0; thi < nth; ++thi) {
-                const double th = thi * dth;
+                const double th = thi * dth + dth/2.;
                 const double costh = std::cos(th);
                 const double sinth = std::sin(th);
                 const double pc = (costh * (xi + 0.5 - cx) + sinth * (cx - yi - 0.5)) / dr + cr;
 
-                const double lb = pc - 0.7071067811865476 / dr;
-                const double hb = pc + 0.7071067811865476 / dr;
-                //const double lb = pc - 0.9 / dr;
-                //const double hb = pc + 0.9 / dr;
+                //const double lb = pc - 0.7071067811865476 / dr;
+                //const double hb = pc + 0.7071067811865476 / dr;
+                const double lb = pc - blob_r / dr;
+                const double hb = pc + blob_r / dr;
 
                 const double al = std::floor(lb+1) - lb;
                 const int ril = std::floor(lb);
                 const double ah = hb - std::floor(hb);
                 const int rih = std::floor(hb);
 
-                const double scale = dr / 1.4142135623730951;
+                const double scale = dr / blob_r / 2;
 
                 if (ril == rih) {  // projected pixel within a detector's boundary
                     add_element(xi, yi, thi, rih, (hb - lb) * scale, out);
