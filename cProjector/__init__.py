@@ -35,6 +35,8 @@ class Projector(object):
         self.detectors_center = self.detectors_offset + self.detectors_origin
         self.update_detectors_length(self.NoI)
         self.dtheta = math.pi / self.NoA
+        self.sig_scale = numpy.sqrt(1. / (2. * self.NoA))
+        self.sig_scale = 1
 
         self.sysmat_need_update = True
         self.sysmat = None
@@ -91,12 +93,13 @@ class Projector(object):
         assert self.is_valid_dimension(img, proj)
         self._fit_sysmat()
         proj[:] = (self.sysmat * img.reshape(-1)).reshape(self.NoA, self.NoD)
+        proj *= self.sig_scale
 
     def backward(self, proj, img):
         assert self.is_valid_dimension(img, proj)
         self._fit_sysmat()
         img[:] = (self.sysmatT * proj.reshape(-1)).reshape(self.NoI, self.NoI)
-        img /= 2 * self.NoA
+        img *= self.sig_scale
 
     def partial_forward(self, img, proj, th_indexes):
         assert self.is_valid_dimension(img, proj)

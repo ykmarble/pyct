@@ -1,10 +1,10 @@
 #!/usr/bin/env python2
 
-import projector
+import cProjector
 import math
 import numpy
 
-class Projector(projector.Projector):
+class Projector(cProjector.Projector):
     def __init__(self, length_of_image_side, num_of_angles, num_of_detectors):
         """
         Notice: `num_of_detectors` means a shape of *differential* projection data.
@@ -35,12 +35,18 @@ class Projector(projector.Projector):
         super(self.__class__, self).partial_backward(self.last_proj, img, th_indexes)
 
     def rdiff(self, proj, diff_proj):
-        diff_proj[:, :-1] = proj[:, 1:] - proj[:, :-1]
+        diff_proj[:, 1:-1] = proj[:, 2:] - proj[:, :-2]
+        diff_proj[:, 0] = 0
         diff_proj[:, -1] = 0
+        diff_proj /= 2.
+        #diff_proj[:, :-1] = proj[:, 1:] - proj[:, :-1]
+        #diff_proj[:, -1] = 0
 
     def t_rdiff(self, diff_proj, proj):
+        proj[:, 1:-1] = diff_proj[:, :-2] - diff_proj[:, 2:]
         proj[:, 0] = -diff_proj[:, 0]
-        proj[:, 1:] = diff_proj[:, :-1] - diff_proj[:, 1:]
+        proj[:, -1] = diff_proj[:, -1]
+        proj /= 2.
 
 def rotate(proj, angle):
     """

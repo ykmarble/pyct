@@ -27,12 +27,12 @@ W_sup = 0.85
 
 
 def finite_hilbert_filter(f):
-    return weighted_hilbert_filter(f, numpy.ones(f.shape[1]), W_sup)
+    return -weighted_hilbert_filter(f, numpy.ones(f.shape[1]), W_sup)
 
 
 def inv_finite_hilbert_filter(f):
     W = numpy.sqrt(1 - numpy.linspace(-W_sup, W_sup, f.shape[1])**2)
-    return -weighted_hilbert_filter(f, W, W_sup) / W
+    return weighted_hilbert_filter(f, W, W_sup) / W
 
 
 def freq_hilbert_filter(f, scale=10):

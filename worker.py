@@ -1,10 +1,11 @@
 #!/usr/bin/env python2
 # -*- coding:utf-8 -*-
 
-#from projector import Projector
 from cProjector import Projector
+#from differencial import Projector
 import utils
 import ctfilter
+import dbp
 from tv_denoise import tv_denoise_chambolle as prox_tv
 from skimage.restoration import denoise_tv_bregman as sk_tv
 import numpy
@@ -41,7 +42,7 @@ def main(method):
     HU_lim = [0.45, 0.55]
     #HU_lim = [0.3, 0.45]
 
-    scale = 0.6
+    scale = 0.65
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -94,6 +95,7 @@ def main(method):
     # estimate initial value
     initial_x = utils.zero_img(full_A)
     initial_y = interpolate_initial_y(full_proj, ymask, support)
+    #initial_y = full_proj
 
     # generate proximal operators
     tv_alpha = 0.05
@@ -110,7 +112,7 @@ def main(method):
         x[x > 1] = 1
 
     known_mask = utils.zero_img(full_A)
-    utils.create_elipse_mask((full_A.center_x+0, full_A.center_y+0), 8, 60, known_mask)
+    utils.create_elipse_mask((full_A.center_x+0, full_A.center_y+0), 60, 10, known_mask)
     known = img.copy()
     known[known_mask != 1] = 0
 
@@ -137,6 +139,7 @@ def main(method):
         #prox_edgeblur(x)
 
         #x[:, :] = skimage.filters.gaussian(x)
+        prox_sup(x)
         x[:, :] = sk_tv(x, 800)
 
     def prox_b(y):
@@ -164,6 +167,14 @@ def main(method):
     def G_sh(y):
         ctfilter.shepp_logan_filter(y)
 
+    def G_hl(y):
+        y[:] = dbp.freq_hilbert_filter(y, scale=1)
+        y /= 360.
+
+    def G_ir(y):
+        ctfilter.inv_ramp_filter(y)
+        y /= 1500.
+
     # setup callback routine
     viewer = utils.IterViewer(img, interior_proj, xmask, interior_A, clim=HU_lim)
     logger = utils.IterLogger(img, interior_proj, xmask, interior_A, subname="")
@@ -186,10 +197,10 @@ def main(method):
         utils.show_image(initial_x*xmask, clim=HU_lim)
 
     if "iterative_fbp.py" == method_id:
-        alpha = 0.9
+        alpha = 0.5
         phi_x = prox_known
         method(interior_A, interior_proj, alpha, niter,
-               phi_x=lambda x: x,
+               phi_x=phi_x,
                G=G_sh,
                x=initial_x,
                iter_callback=viewer)
@@ -206,7 +217,7 @@ def main(method):
                iter_callback=viewer)
 
     if "sirt.py" == method_id:
-        alpha = 0.02
+        alpha = 64./NoI/NoI
         method(interior_A, interior_proj, alpha, niter,
                x=initial_x,
                iter_callback=viewer)

@@ -115,10 +115,10 @@ def main():
     output_length = 256
     oversample_scale = 2.5
 
-    oversampled_phantom = simplePhantom(int(output_length * oversample_scale))
+    oversampled_phantom = modSheppLoganPhantom(int(output_length * oversample_scale))
     phantom = skimage.transform.resize(oversampled_phantom, (output_length, output_length))
 
-    utils.save_rawimage(phantom, "SimplePhantom.dat")
+    utils.save_rawimage(phantom, "modSLP.dat")
 
 if __name__ == '__main__':
     main()

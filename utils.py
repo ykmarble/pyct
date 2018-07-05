@@ -9,7 +9,7 @@ import cv2
 import time
 from math import sqrt, atan2, pi
 
-DTYPE_t = numpy.float32
+DTYPE_t = numpy.float
 
 def decompose_path(path):
     """

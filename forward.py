@@ -3,7 +3,9 @@
 import numpy
 import utils
 import cProjector
+import differencial
 import ctfilter
+import dbp
 import sys
 
 def main():
@@ -36,9 +38,13 @@ def main():
     NoI = img.shape[0]
     NoD = NoA = NoI
     A = cProjector.Projector(NoI, NoA, NoD)
-    A.update_detectors_length(NoI * 0.5)
+    A.update_detectors_length(NoI * 1)
     proj = utils.zero_proj(A)
     A.forward(img, proj)
+    utils.show_image(proj)
+    ctfilter.shepp_logan_filter(proj)
+    #proj[:] = dbp.inv_freq_hilbert_filter(proj)
+    #ctfilter.inv_ramp_filter(proj)
     utils.show_image(proj)
     ctfilter.shepp_logan_filter(proj)
     rproj = utils.zero_img(A)
