@@ -3,12 +3,12 @@ import numpy
 import math
 
 
-def sysmat_joseph(nx, nth, nr, detectors_length):
-    return sysmat_data_joseph(nx, nth, nr, detectors_length)
+def sysmat_joseph(nx, nth, nr, cx, cy, detectors_length):
+    return sysmat_data_joseph(nx, nth, nr, cx, cy, detectors_length)
 
 
-def sysmat_dd(nx, nth, nr, detectors_length):
-    return sysmat_data_dd(nx, nth, nr, detectors_length)
+def sysmat_dd(nx, nth, nr, cx, cy, detectors_length):
+    return sysmat_data_dd(nx, nth, nr, cx, cy, detectors_length)
 
 
 class Projector(object):
@@ -17,7 +17,6 @@ class Projector(object):
         self.NoD = num_of_detectors      # number of detectors
         self.NoA = num_of_angles         # number of projection angles
 
-        self.image_origin = self.NoI / 2. + 0.5     # num_of_image_sides / 2
         self.detectors_origin = self.NoD / 2. + 0.5 # num_of_detectors / 2
 
         # variables used when computing projection
@@ -27,24 +26,23 @@ class Projector(object):
         # center_x          : derived from image_origin and x_offset
         # center_y          : derived from image_origin and y_offset
         # detectors_center  : derived from detectors_origin and detectors_offset
+        self.center_x = (self.NoI - 1)/2.
+        self.center_y = (self.NoI - 1)/2.
         self.x_offset = 0
-        self.center_x = self.x_offset + self.image_origin
         self.y_offset = 0
-        self.center_y = -self.y_offset + self.image_origin
         self.detectors_offset = 0
         self.detectors_center = self.detectors_offset + self.detectors_origin
         self.update_detectors_length(self.NoI)
         self.dtheta = math.pi / self.NoA
         self.sig_scale = numpy.sqrt(1. / (2. * self.NoA))
-        self.sig_scale = 1
 
         self.sysmat_need_update = True
         self.sysmat = None
         self.sysmatT = None
         self.partial_sysmat = {}
         self.partial_sysmatT = {}
-        #self.sysmat_builder = sysmat_joseph
-        self.sysmat_builder = sysmat_dd
+        self.sysmat_builder = sysmat_joseph
+        #self.sysmat_builder = sysmat_dd
 
     def get_image_shape(self):
         return (self.NoI, self.NoI)
@@ -78,10 +76,12 @@ class Projector(object):
         self.sysmat_need_update = True
 
     def update_center_x(self, x):
-        raise NotImplementedError
+        self.center_x = float(x)
+        self.sysmat_need_update = True
 
     def update_center_y(self, y):
-        raise NotImplementedError
+        self.center_y = float(y)
+        self.sysmat_need_update = True
 
     def is_valid_dimension(self, img, proj):
         return img.shape[0] == img.shape[1] \
@@ -93,13 +93,14 @@ class Projector(object):
         assert self.is_valid_dimension(img, proj)
         self._fit_sysmat()
         proj[:] = (self.sysmat * img.reshape(-1)).reshape(self.NoA, self.NoD)
-        proj *= self.sig_scale
+        #proj *= self.sig_scale
 
     def backward(self, proj, img):
         assert self.is_valid_dimension(img, proj)
         self._fit_sysmat()
         img[:] = (self.sysmatT * proj.reshape(-1)).reshape(self.NoI, self.NoI)
-        img *= self.sig_scale
+        #img *= self.sig_scale
+        img *= self.sig_scale * self.sig_scale
 
     def partial_forward(self, img, proj, th_indexes):
         assert self.is_valid_dimension(img, proj)
@@ -133,7 +134,7 @@ class Projector(object):
     def _fit_sysmat(self):
         if self.sysmat_need_update:
             self.sysmat_need_update = False
-            self.sysmat = self.sysmat_builder(self.NoI, self.NoA, self.NoD, self.detectors_length)
+            self.sysmat = self.sysmat_builder(self.NoI, self.NoA, self.NoD, self.center_x, self.center_y, self.detectors_length)
             self.sysmatT = self.sysmat.transpose()
             self.partial_sysmat = {}
             self.partial_sysmatT = {}

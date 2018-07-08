@@ -26,7 +26,8 @@ def main():
         utils.crop_elipse(mask, (c, c), a+0, b+0, value=1)
         utils.crop_elipse(mask, (c, c), a-2.5, b-2.5, value=0)
         mask[20:] = 0
-        bg = numpy.average(img[mask == 1])
+        samplep = int(img.shape[1] / 2.)
+        bg = numpy.average(img[10, samplep-5:samplep+5])
         img -= bg
 
         mask[:, :] = 0

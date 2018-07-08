@@ -8,7 +8,7 @@ import numpy
 
 
 def tv_derivative(img, derivative):
-    epsilon = 1e-3
+    epsilon = 1e-4
     mu = numpy.full_like(img, epsilon**2)
     # [1:-2, 1:-2] (m, n)
     # [2:-1, 1:-2] (m+1, n)
@@ -19,7 +19,7 @@ def tv_derivative(img, derivative):
                       + (img[1:-2, 2:-1] - img[1:-2, 1:-2])**2  \
                       + (img[1:-2, 1:-2] - img[0:-3, 1:-2])**2  \
                       + (img[1:-2, 1:-2] - img[1:-2, 0:-3])**2
-    numpy.sqrt(mu, mu)
+    mu[:] = numpy.sqrt(mu)
     derivative[:, :] = 0
     derivative[1:-2, 1:-2] = \
       (4 * img[1:-2, 1:-2] - img[2:-1, 1:-2] - img[1:-2, 2:-1] - img[0:-3, 1:-2] - img[1:-2, 0:-3]) / mu[1:-2, 1:-2] \

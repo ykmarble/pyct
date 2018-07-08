@@ -14,6 +14,8 @@ CSRMat<T> buildMatrixWithJosephMethod(
     const size_t nx,
     const size_t nt,
     const size_t nr,
+    const double cx,
+    const double cy,
     const double detectors_length)
 {
     std::cout << "Generate system matrix with Joseph method." << std::endl;
@@ -31,8 +33,6 @@ CSRMat<T> buildMatrixWithJosephMethod(
 
     const double dtheta = M_PI / nt;
     const double dr = detectors_length / nr;
-    const double cx = (nx - 1) / 2.;
-    const double cy = (nx - 1) / 2.;
     const double cr = (nr - 1) / 2.;
 
     for (int ti = 0; ti < nt; ++ti) {

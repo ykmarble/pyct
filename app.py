@@ -30,9 +30,6 @@ def app(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y:
     img = utils.zero_img(A)
     proj = utils.zero_proj(A)
 
-    old_mu = mu.copy()
-
-    A.forward(x, proj)
     proj -= y
     G(proj)
     mu_bar = mu + alpha * proj
@@ -47,17 +44,16 @@ def app(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y:
     A.forward(x, proj)
     proj -= y
     G(proj)
-    old_mu = mu.copy()
+    mu_bar[:] = -mu[:]
     mu += alpha * proj
+    mu_bar += 2 * mu
 
     iter_callback(0, x, y, mu)
 
     for i in xrange(niter-1):
-        mu_bar = 2 * mu - old_mu
-
         A.backward(mu_bar, img)
         x -= beta * img
-        phi_x(x)
+        phi_x(x, beta)
 
         y += beta * mu_bar
         phi_y(y)
@@ -65,8 +61,10 @@ def app(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y:
         A.forward(x, proj)
         proj -= y
         G(proj)
-        old_mu = mu.copy()
+
+        mu_bar[:] = -mu[:]
         mu += alpha * proj
+        mu_bar += 2 * mu
 
         iter_callback(i+1, x, y, mu)
 

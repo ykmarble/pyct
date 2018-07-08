@@ -7,24 +7,24 @@ import utils
 import ctfilter
 import dbp
 from tv_denoise import tv_denoise_chambolle as prox_tv
-from skimage.restoration import denoise_tv_bregman as sk_tv
+from skimage.restoration import denoise_tv_chambolle as sk_tv
 import numpy
 import skimage.filters
 import os.path
 import sys
 
 
-def interpolate_initial_y(truncated_y, mask_y, support=0):
+def interpolate_initial_y(truncated_y, inpaint_y, support=0):
     y = truncated_y.copy()
-    y[mask_y == 0] = float("inf")
+    y[inpaint_y == 1] = float("inf")
     utils.inpaint_metal(y, support)  # it's named by "metal" but this is apricable for truncated sinogram
     return y
 
 
 def gen_support(img, center, r):
     # 自動で覆うような楕円を計算してくれるとハッピー
-    elipse_center = numpy.array(img.shape) / 2.
-    elipse_r = numpy.array(img.shape) / 2.
+    elipse_center = center
+    elipse_r = r
 
     #elipse_center = numpy.array(img.shape) / 2.
     #elipse_r = numpy.array(img.shape) / 2.
@@ -38,11 +38,13 @@ def gen_support(img, center, r):
 
 
 def main(method):
-    #HU_lim = [0, 0.3]
-    HU_lim = [0.45, 0.55]
-    #HU_lim = [0.3, 0.45]
+    #HU_lim = [0.45, 0.55]  # slp
+    #HU_lim = [0., 0.08]  # lung
+    HU_lim = [0.45, 0.55]  # abd
 
-    scale = 0.65
+    #scale = 0.65 #slp
+    scale = 0.6  # abd
+    #scale = 0.8  # lung
 
     if len(sys.argv) != 2:
         print "Usage: {} <rawfile>"
@@ -52,22 +54,39 @@ def main(method):
         print "invalid path"
         sys.exit(1)
 
+    # derive projector constants
     img = utils.load_rawimage(path)
     NoI = img.shape[0]
     NoA = int(NoI * 1.2)
-    NoD = int(NoI * 1.2)
+    NoD = int(NoI * 1.)
+    full_NoA = NoA
+    #full_NoD = int(round(NoD*1/scale))  # slp
+    #center_x = (NoI - 1) / 2.  # slp
+    #center_y = (NoI - 1) / 2.  # slp
+    #full_NoD = int(round(NoD*1/scale)+50)  # lung
+    #center_x = (NoI - 1) / 2. -20 # lung
+    #center_y = (NoI - 1) / 2.  # lung
+    full_NoD = int(round(NoD*1/scale))  # abd
+    center_x = (NoI - 1) / 2. # abd
+    center_y = (NoI - 1) / 2. # abd
 
     # interior projection
     interior_A = Projector(NoI, NoA, NoD)
     interior_A.update_detectors_length(NoI*scale)
+    interior_A.update_center_x(center_x)
+    interior_A.update_center_y(center_y)
     interior_proj = utils.zero_proj(interior_A)
     interior_A.forward(img, interior_proj)
 
     # global projection
-    full_NoA = NoA
-    full_NoD = int(round(NoD*1/scale))
-    assert NoD == int(round(full_NoD * scale))
     full_A = Projector(NoI, full_NoA, full_NoD)
+    full_A.update_center_x(center_x)
+    full_A.update_center_y(center_y)
+    #full_A.update_detectors_length(NoI)  #slp
+    #full_A.update_detectors_length(NoI+50)  # lung
+    full_A.update_detectors_length(NoI+0)  # abd
+    full_proj = utils.zero_proj(full_A)
+    full_A.forward(img, full_proj)
 
     # calculate roi and its sinogram
     xmask = utils.zero_img(full_A)
@@ -76,32 +95,32 @@ def main(method):
     full_A.forward(xmask, ymask)
     ymask[ymask != 0] = 1
 
-    supmask = gen_support(img, (full_A.center_x, full_A.center_y), (NoI/2., NoI/2.))
+    #supmask = gen_support(img, (full_A.center_x, full_A.center_y), (NoI/2.-10, NoI/2.))  # slp
+    #supmask = gen_support(img, (NoI/2.-5, NoI/2.), (NoI/2.+20, NoI/2.-20))  # lung
+    supmask = gen_support(img, (NoI/2., NoI/2.), (NoI/2., NoI/2.-20))  # abd
     supmask_sin = utils.zero_proj(full_A)
     full_A.forward(supmask, supmask_sin)
     supmask_sin[supmask_sin!=0] = 1
+    utils.show_image(supmask*img)
 
     # create truncated sinogram
-    full_proj = utils.zero_proj(full_A)
-    full_A.forward(img, full_proj)
+    #full_A.forward(img, full_proj)
     scout_proj = full_proj.copy()
     support = full_proj[0, 0]
     full_proj[ymask == 0] = 0
 
-    roundmask = utils.zero_proj(full_A)
-    roundmask[:, full_NoD/2-NoD/2:full_NoD/2] = utils.interpolate(0, 1, NoD/2)[None, :]
-    roundmask[:, full_NoD/2:full_NoD/2+NoD/2] = utils.interpolate(1, 0, NoD/2)[None, :]
-
     # estimate initial value
     initial_x = utils.zero_img(full_A)
-    initial_y = interpolate_initial_y(full_proj, ymask, support)
+    initial_y = interpolate_initial_y(full_proj, (supmask_sin - ymask), support)
     #initial_y = full_proj
 
     # generate proximal operators
-    tv_alpha = 0.05
+    #tv_alpha = 0.005  # slp
+    #tv_alpha = 0.008  # lung
+    tv_alpha = 0.012  # abd
 
-    def prox_tv_all(x):
-        x[:, :] = sk_tv(x, 1./tv_alpha)
+    def prox_tv_all(x, alpha=1.):
+        x[:, :] = sk_tv(x, alpha * tv_alpha)
 
     def prox_tv_masked(x):
         prox_tv(x, tv_alpha, mask=xmask)
@@ -131,16 +150,11 @@ def main(method):
         x[edge_mask == 1] = img[edge_mask == 1]
         x[:, :] = skimage.filters.gaussian(x)
 
-    def phi_x(x):
+    def phi_x(x, alpha=1.):
         prox_sup(x)
         #prox_tv_masked(x)
-        prox_tv_all(x)
+        prox_tv_all(x, alpha=alpha)
         #prox_known(x)
-        #prox_edgeblur(x)
-
-        #x[:, :] = skimage.filters.gaussian(x)
-        prox_sup(x)
-        x[:, :] = sk_tv(x, 800)
 
     def prox_b(y):
         y[ymask == 1] = full_proj[ymask == 1]
@@ -156,9 +170,8 @@ def main(method):
         y[supmask_sin == 0] = 0
 
     def phi_y(y):
-        #y[:] = y*(1-roundmask) + full_proj*roundmask
         prox_b(y)
-        #prox_scout(y)
+        prox_scout(y)
         prox_sup_sin(y)
 
     def G_id(y):
@@ -177,24 +190,22 @@ def main(method):
 
     # setup callback routine
     viewer = utils.IterViewer(img, interior_proj, xmask, interior_A, clim=HU_lim)
-    logger = utils.IterLogger(img, interior_proj, xmask, interior_A, subname="")
+    logger = utils.IterLogger(img, interior_proj, xmask, interior_A, subname="", no_forward=True)
 
-    niter = 2000
+    niter = 200
 
     method_id = os.path.basename(sys.argv[0])
-    utils.show_image(interior_proj)
-    utils.show_image(initial_y)
 
     # setup method specific configuration and start calculation
     if "original.py" == method_id:
         utils.show_image(img*xmask, clim=HU_lim)
 
     if "fbp.py" == method_id:
-        utils.show_image(initial_y)
         #method(interior_A, interior_proj, initial_x)
         method(full_A, initial_y, initial_x)
         print numpy.min(initial_x), numpy.max(initial_x)
-        utils.show_image(initial_x*xmask, clim=HU_lim)
+        utils.show_image(initial_x*xmask, HU_lim)
+        logger(9, initial_x)
 
     if "iterative_fbp.py" == method_id:
         alpha = 0.5
@@ -217,7 +228,7 @@ def main(method):
                iter_callback=viewer)
 
     if "sirt.py" == method_id:
-        alpha = 64./NoI/NoI
+        alpha = 0.85
         method(interior_A, interior_proj, alpha, niter,
                x=initial_x,
                iter_callback=viewer)
@@ -233,11 +244,11 @@ def main(method):
                iter_callback=viewer)
 
     if "os_sart_tv.py" == method_id:
-        os_alpha = 1
-        tv_alpha = 0.05
-        tv_alpha_s = 0.9997
+        os_alpha = 0.8
+        tv_alpha = 0.08
+        tv_alpha_s = 0.997
         nsubset = 20
-        ntv = 5
+        ntv = 3
         method(interior_A, interior_proj,
                os_alpha=os_alpha,
                tv_alpha=tv_alpha,
@@ -246,12 +257,12 @@ def main(method):
                ntv=ntv,
                niter=niter,
                x=initial_x,
-               iter_callback=viewer)
+               iter_callback=logger)
 
     if "app.py" == method_id:
-        #alpha = 0.08
-        #alpha = 0.05
-        alpha = 0.8
+        #alpha = 0.8 # slp
+        #alpha = 0.8  # lung
+        alpha = 0.75 # abd
         #def phi_y(y):
         #    y[:, :] = interior_proj
         #method(interior_A, 0.4, alpha, niter,
@@ -263,7 +274,18 @@ def main(method):
                y=initial_y,
                #y=None,
                mu=None,
-               iter_callback=viewer)
+               iter_callback=logger)
+
+    if "cp.py" == method_id:
+        #alpha = 0.05  # slp
+        #alpha = 0.09  # lung
+        alpha = 0.06  # abd
+        #def phi_y(y):
+        #    y[:, :] = interior_proj
+        #method(interior_A, 0.4, alpha, niter,
+        method(interior_A, interior_proj, alpha, alpha, tv_alpha, niter,
+               x=initial_x,
+               iter_callback=logger)
 
     if "ladmm.py" == method_id:
         #alpha = 0.004
