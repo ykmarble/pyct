@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
-from worker import main
+from . import utils
+from .worker import main
 import numpy
 
 
@@ -30,7 +30,7 @@ def estimate_missing_line(A, alpha, niter, phi_x=lambda x: x, phi_y=lambda y: y,
     proj = utils.zero_proj(A)
     A.forward(x, proj)
 
-    for i in xrange(niter):
+    for i in range(niter):
         A.forward(x, proj)
         phi_y(proj)
         G(proj)

@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import cProjector
+from . import cProjector
 import sys
 import os
 import struct
@@ -68,7 +68,7 @@ def show_image(img, clim=None, output_path="saved_img.dat", caption="ctpy"):
         sys.exit()
     elif key == ord("s"):
         save_rawimage(img, "saved_img.dat")
-        print "saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat"))
+        print("saved image at {}".format(os.path.join(os.getcwd(), "saved_img.dat")))
     return chr(key)
 
 def convert_to_polar(img, polar_img):
@@ -76,8 +76,8 @@ def convert_to_polar(img, polar_img):
     polar_img = numpy.zeros((Nr, Nr), dtype=DTYPE_t)
     pc = Nr / 2.
     rc = Nr / 2.
-    for pyi in xrange(Nr):
-        for pxi in xrange(Nr):
+    for pyi in range(Nr):
+        for pxi in range(Nr):
             py = pc - pyi
             px = pxi - pc
             r = sqrt(py**2 + px**2)
@@ -125,8 +125,8 @@ def crop_elipse(img, center, a, b, value=0):
     a_2 = a**2.
     b_2 = b**2.
     ab_2 = a_2 * b_2
-    for xi in xrange(img.shape[1]):
-        for yi in xrange(img.shape[0]):
+    for xi in range(img.shape[1]):
+        for yi in range(img.shape[0]):
             if a_2 * (y - yi)**2 + b_2 * (x - xi)**2 < ab_2:
                 img[yi, xi] = value
 
@@ -160,7 +160,7 @@ def draw_graph(data, canvas):
     c_height, c_width = canvas.shape
     assert len(data) == c_width
     canvas[:, :] = 1
-    for i in xrange(c_width):
+    for i in range(c_width):
         h = round((data[i] - d_mini) / float(d_maxi - d_mini) * (c_height - 1))  # 0 <= h <= c_height - 1
         h = int(c_height - h - 1)
         canvas[h, i] = 0
@@ -185,7 +185,7 @@ def create_sinogram(img, NoA, NoD, scale=1, sample_scale=1, projector=cProjector
     over_proj = zero_proj(A)
     A.forward(img, over_proj)
     proj = numpy.zeros((NoA, NoD), dtype=DTYPE_t)
-    for i in xrange(NoD):
+    for i in range(NoD):
         proj[:, i] = numpy.sum(over_proj[:, i*sample_scale:(i+1)*sample_scale], axis=1)
     proj /= sample_scale
     return proj
@@ -207,10 +207,10 @@ def inpaint_metal(proj, support=0):
     Inpainting infinity of `proj` by interpolation.
     """
     NoA, NoD = proj.shape
-    for i in xrange(NoA):
+    for i in range(NoA):
         inf_len = 0
         bound_number = [0, 0]  # previous ct-number, next ct-number (both are not inf)
-        for j in xrange(NoD):
+        for j in range(NoD):
             if proj[i, j] == float("inf"):
                 if inf_len == 0:
                     if j > 0:  # left bound of inf
@@ -256,7 +256,7 @@ class IterLogger(object):
         self.dirpath = os.path.join(os.getcwd(), "iterout", method, timestamp+subname)
 
     def initialize(self):
-        print "output dir: {}".format(self.dirpath)
+        print("output dir: {}".format(self.dirpath))
         self._mkdir(self.dirpath)
 
         # log file
@@ -273,7 +273,7 @@ class IterLogger(object):
         xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
         yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)
 
-        print i+1, xrmse, yrmse
+        print(i+1, xrmse, yrmse)
         self.log_handler.write("{} {} {} {}\n".format(i+1, xrmse, yrmse, time.time()))
         self.log_handler.flush()
 
@@ -309,6 +309,6 @@ class IterViewer(object):
         self.A.forward(x, self.proj)
         xrmse = numpy.sqrt(numpy.sum(((x - self.xtr)*self.xmask)**2) / self.xn)
         yrmse = numpy.sqrt(numpy.sum((self.proj - self.ytr)**2) / self.yn)
-        print i+1, xrmse, yrmse
+        print(i+1, xrmse, yrmse)
         if (i+1) % self.niter == 0:
             show_image(x*self.xmask, clim=self.clim)

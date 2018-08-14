@@ -1,11 +1,10 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
-import utils
-import ctfilter
+from pyct import utils
+from pyct import ctfilter
+from pyct.tv_denoise import grad, div_2
+from pyct.worker import main
 import numpy
-from tv_denoise import grad, div_2
-from worker import main
 
 
 def tpv(A, b, p, v, ramda, eps, tau, sigma, eta, niter, iter_callback=lambda *arg: 0):
@@ -38,7 +37,7 @@ def tpv(A, b, p, v, ramda, eps, tau, sigma, eta, niter, iter_callback=lambda *ar
     last_wh = utils.zero_img(A)
     last_wv = utils.zero_img(A)
 
-    for i in xrange(niter):
+    for i in range(niter):
         A.forward(x_bar, proj)
         proj -= b
         ctfilter.shepp_logan_filter(proj)

@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import cProjector
+from . import cProjector
 import math
 import numpy
 
@@ -54,7 +54,7 @@ def rotate(proj, angle):
     """
     NoA, NoD = proj.shape
     dth = math.pi / NoA
-    for i in xrange(NoA):
+    for i in range(NoA):
         if dth * i > angle:
             break
         proj[i] *= -1
@@ -63,17 +63,17 @@ def rotate(proj, angle):
 def main():
     import sys
     import os.path
-    import utils
+    from . import utils
     if len(sys.argv) != 2:
-        print "Usage: {} <rawfile>"
+        print("Usage: {} <rawfile>")
         sys.exit(1)
     path = sys.argv[1]
     if not os.path.exists(path):
-        print "invalid path"
+        print("invalid path")
         sys.exit(1)
     img = utils.load_rawimage(path)
     if img is None:
-        print "invalid file"
+        print("invalid file")
         sys.exit(1)
 
     angle_px = detector_px = width_px = img.shape[1]
@@ -84,13 +84,13 @@ def main():
     dbp = utils.empty_img(accA)
     A.forward(img, proj)
     orig_proj = proj
-    for i in xrange(361):
+    for i in range(361):
         proj = orig_proj.copy()
         rotate(proj, math.pi/360*1*i)
         accA.backward(proj, dbp)
         recon += dbp
         utils.show_image(proj)
-        print i
+        print(i)
 
 if __name__ == '__main__':
     main()

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import numpy
 
@@ -37,7 +37,7 @@ def tv_denoise_chambolle(img, alpha, max_iter=200, mask=None):
     grad_y = numpy.empty_like(img)
     last_div_p = numpy.zeros_like(img)
     denom = numpy.empty_like(img)
-    for i in xrange(max_iter):
+    for i in range(max_iter):
         div_2(p_x, p_y, div_p)
         grad(div_p - img / alpha, grad_x, grad_y)
         grad_x[:, :-1] *= mask[:, 1:]

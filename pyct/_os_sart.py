@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
-from pyct import utils
-from pyct import cProjector
-from pyct import differencial
-from pyct._os_sart import *
-from pyct.worker import main
+from .worker import main
+from . import utils
+from . import cProjector
+from . import differencial
 import numpy
 
 
@@ -94,24 +93,3 @@ def os_sart_mainloop(A, data, recon, alpha, a_ip, a_pj_subset, subsets, i, img, 
     A.partial_backward(proj, img, cur_subset)
     img /= a_pj_subset[i_subset]
     recon += alpha * img
-
-def os_sart(A, b, alpha=0.9, nsubset=10, niter=1000, x=None, iter_callback=lambda *x: None):
-    if x is None:
-        x = utils.empty_img(A)
-        x[:, :] = 0
-    img = utils.empty_img(A)
-    proj = utils.empty_proj(A)
-
-    NoA, NoD = proj.shape
-    subsets = make_subset(NoA, nsubset)
-    a_ip, a_pj_subset = calc_scale(A, subsets)
-
-    for i in range(niter):
-        for nart in range(nsubset):
-            os_sart_mainloop(A, b, x, alpha, a_ip, a_pj_subset, subsets, nart, img, proj)
-        A.forward(x, proj)
-        iter_callback(i, x, proj)
-
-
-if __name__ == '__main__':
-    main(os_sart)

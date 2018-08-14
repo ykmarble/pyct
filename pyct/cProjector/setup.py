@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext

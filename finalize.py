@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
-import cProjector
-import ctfilter
+from pyct import utils
+from pyct import cProjector
+from pyct import ctfilter
 import numpy
 import sys
 
@@ -50,5 +50,5 @@ utils.show_image(recon_proj)
 final_img = utils.zero_img(full_A)
 ctfilter.shepp_logan_filter(recon_proj)
 full_A.backward(recon_proj, final_img)
-print numpy.min(final_img), numpy.max(final_img)
+print(numpy.min(final_img), numpy.max(final_img))
 utils.show_image(final_img*xmask, HU_lim)

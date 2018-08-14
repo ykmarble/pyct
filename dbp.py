@@ -1,56 +1,14 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
-from cython_filter import weighted_hilbert_filter
-import utils
-import projector
+from pyct import utils
+from pyct.ctfilter import finite_hilbert_filter, inv_finite_hilbert_filter
+from pyct.cProjector import Projector
 import numpy
 import math
 import sys
 from skimage.restoration import denoise_tv_bregman as sk_tv
 
 viewer = None
-
-W_sup = 0.85
-
-#def weighted_hilbert_filter(f, W):
-#    assert len(f.shape) == 2
-#    sl = numpy.linspace(-W_sup, W_sup, f.shape[1])
-#    out = numpy.zeros_like(f, dtype=float)
-#    for i in xrange(f.shape[0]):
-#        print i
-#        for j in xrange(f.shape[1]):
-#            t = j / float(f.shape[1]) * 2 - 1
-#            out[i, j] = sum(f[i, k] / (s - t) * W[k] for k, s in enumerate(sl) if s - t != 0 and -1 <= s <= 1) / W[j]
-#    out /= math.pi
-#    return out
-
-
-def finite_hilbert_filter(f):
-    return -weighted_hilbert_filter(f, numpy.ones(f.shape[1]), W_sup)
-
-
-def inv_finite_hilbert_filter(f):
-    W = numpy.sqrt(1 - numpy.linspace(-W_sup, W_sup, f.shape[1])**2)
-    return weighted_hilbert_filter(f, W, W_sup) / W
-
-
-def freq_hilbert_filter(f, scale=10):
-    j = complex("j")
-    assert len(f.shape) == 2
-    n = f.shape[1] * scale
-    F = numpy.fft.fft(f, n)
-    H = numpy.zeros(n, dtype=complex)
-    H[1:n/2] = -j
-    H[n/2+1:] = j
-    F *= H
-    return numpy.fft.ifft(F).real
-
-
-def inv_freq_hilbert_filter(f):
-    return -freq_hilbert_filter(f, 1)[:, :256]
-
-
 
 def dbp(A, proj, img, theta=0):
     """
@@ -91,7 +49,7 @@ def dbp(A, proj, img, theta=0):
     #A.update_detectors_offset(doffset)
 
 
-def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1000):
+def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1000, W_sup = 0.85):
     """
     ROI reconstruction algorithm by DBP-POCS method.
     Prior region is very restricted because of implementation difficulty.
@@ -119,9 +77,9 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
         Ht = inv_finite_hilbert_filter
 
     energy = numpy.zeros(A.NoI)
-    for i in xrange(A.NoI):
+    for i in range(A.NoI):
         idx = A.convidx_img2r(i, 0, 0)
-        if 0 <= idx < len(energy) and roi[i, A.NoI / 2] == 1:
+        if 0 <= idx < len(energy) and roi[i, A.NoI // 2] == 1:
             energy[i] = b[0, idx]
 
     p4_mask = sup_mask - sup_mask * prior_mask  # maybe 2d
@@ -134,7 +92,7 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
 
     global viewer
 
-    for i in xrange(niter):
+    for i in range(niter):
         # p1 data constraint
         C = numpy.sum(x, axis=1)[:, None] / W / math.pi  / 100
         if i % 2 == 0:
@@ -173,34 +131,34 @@ def dbp_pocs_reconstruction(A, b, roi, prior, prior_mask, sup_mask=None, niter=1
 def test_total_hilbert_conversions_and_dbp(img):
     scale = 1
     NoI = NoA = NoD = img.shape[0]
-    A = projector.Projector(NoI, NoA, NoD)
+    A = Projector(NoI, NoA, NoD)
     proj = utils.create_sinogram(img, NoA, NoD, scale)
     A.forward(img, proj)
 
     dbp_img = utils.zero_img(A)
     dbp(A, proj, dbp_img, 0)
 
-    hilbert_img = finite_hilbert_filter(img)
+    hilbert_img = finite_hilbert_filter(img, W_sup)
 
     # must be the same image
-    print "h {}, {}".format(numpy.min(hilbert_img), numpy.max(hilbert_img))
-    print "d {}, {}".format(numpy.min(dbp_img), numpy.max(dbp_img))
+    print("h {}, {}".format(numpy.min(hilbert_img), numpy.max(hilbert_img)))
+    print("d {}, {}".format(numpy.min(dbp_img), numpy.max(dbp_img)))
 
     roi = utils.zero_img(A)
     utils.create_elipse_mask(((NoI-1)/2., (NoI-1)/2.), (NoI-1)/2.*scale-2, (NoI-1)/2.*scale-2, roi)
 
     # original image will be showen
-    inv = inv_finite_hilbert_filter(hilbert_img)
+    inv = inv_finite_hilbert_filter(hilbert_img, W_sup)
     W = numpy.sqrt(1 - numpy.linspace(-W_sup, W_sup, inv.shape[1])**2)
     C = numpy.sum(inv, axis=1)[:, None] / W / math.pi / 23
     utils.show_image(C)
     inv += C
-    print "{}, {}".format(numpy.min(inv), numpy.max(inv))
+    print("{}, {}".format(numpy.min(inv), numpy.max(inv)))
     utils.show_image(img, clim=(0.45, 0.55))
     utils.show_image(inv, clim=(0.45, 0.55))
 
 def printl(l):
-    print l
+    print(l)
 
 def main():
     scale = 1
@@ -211,9 +169,9 @@ def main():
     NoI = img.shape[0]
     NoA = NoI
     NoD = int(NoI * scale)
-    A = projector.Projector(NoI, NoA, NoD)
+    A = Projector(NoI, NoA, NoD)
     A.update_detectors_length(scale * NoI)
-    bigA = projector.Projector(NoI, NoA, NoD)
+    bigA = Projector(NoI, NoA, NoD)
     bigA.update_detectors_length(scale * NoI)
 
     proj = utils.create_sinogram(img, NoA, NoD, scale)
@@ -229,7 +187,7 @@ def main():
 
     known = img.copy()
     known_mask = utils.zero_img(A)
-    known_mask[:, NoI/2-5:NoI/2+7] = 1
+    known_mask[:, NoI//2-5:NoI//2+7] = 1
     known_mask[roi != 1] = 0
     known[known_mask != 1] = 0
 

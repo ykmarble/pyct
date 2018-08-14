@@ -1,7 +1,6 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
-import utils
+from pyct import utils
 import numpy
 import sys
 import os
@@ -9,7 +8,7 @@ import os
 
 def main():
     if len(sys.argv) == 1:
-        print "Usage: {} <file>".format(sys.argv[0])
+        print("Usage: {} <file>".format(sys.argv[0]))
         sys.exit(1)
 
     for path in sys.argv[1:]:
@@ -18,7 +17,7 @@ def main():
         img = utils.load_rawimage(path)
 
         if img is None or img.shape[0] != img.shape[1]:
-            print "{} is invalid".format(path)
+            print("{} is invalid".format(path))
 
         mask = numpy.zeros_like(img)
         c = (img.shape[0] - 1) / 2.
@@ -41,7 +40,7 @@ def main():
 
         out_path = os.path.join(dname, "normalized_{}.{}".format(fname, ext))
         utils.save_rawimage(img, out_path)
-        print "saved normalized image to {}".format(out_path)
+        print("saved normalized image to {}".format(out_path))
 
 
 if __name__ == '__main__':

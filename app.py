@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
-from worker import main
+from pyct import utils
+from pyct.worker import main
 import numpy
 
 
@@ -50,7 +50,7 @@ def app(A, alpha, beta, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y:
 
     iter_callback(0, x, y, mu)
 
-    for i in xrange(niter-1):
+    for i in range(niter-1):
         A.backward(mu_bar, img)
         x -= beta * img
         phi_x(x, beta)

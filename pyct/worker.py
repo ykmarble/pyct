@@ -1,12 +1,10 @@
-#!/usr/bin/env python2
-# -*- coding:utf-8 -*-
+#!/usr/bin/env python3
 
-from cProjector import Projector
+from .cProjector import Projector
 #from differencial import Projector
-import utils
-import ctfilter
-import dbp
-from tv_denoise import tv_denoise_chambolle as prox_tv
+from . import utils
+from . import ctfilter
+from .tv_denoise import tv_denoise_chambolle as prox_tv
 from skimage.restoration import denoise_tv_chambolle as sk_tv
 import numpy
 import skimage.filters
@@ -38,20 +36,20 @@ def gen_support(img, center, r):
 
 
 def main(method):
-    #HU_lim = [0.45, 0.55]  # slp
+    HU_lim = [0.45, 0.55]  # slp
     #HU_lim = [0., 0.08]  # lung
-    HU_lim = [0.45, 0.55]  # abd
+    #HU_lim = [0.45, 0.55]  # abd
 
     #scale = 0.65 #slp
     scale = 0.6  # abd
     #scale = 0.8  # lung
 
     if len(sys.argv) != 2:
-        print "Usage: {} <rawfile>"
+        print("Usage: {} <rawfile>")
         sys.exit(1)
     path = sys.argv[1]
     if not os.path.exists(path):
-        print "invalid path"
+        print("invalid path")
         sys.exit(1)
 
     # derive projector constants
@@ -153,15 +151,15 @@ def main(method):
     def phi_x(x, alpha=1.):
         prox_sup(x)
         #prox_tv_masked(x)
-        prox_tv_all(x, alpha=alpha)
-        #prox_known(x)
+        #prox_tv_all(x, alpha=alpha)
+        prox_known(x)
 
     def prox_b(y):
         y[ymask == 1] = full_proj[ymask == 1]
 
     scout_mask = utils.zero_proj(full_A)
     scout_mask[0] = 1
-    scout_mask[scout_mask.shape[0]/2] = 1
+    scout_mask[scout_mask.shape[0]//2] = 1
 
     def prox_scout(y):
         y[scout_mask == 1] = scout_proj[scout_mask == 1]
@@ -171,7 +169,7 @@ def main(method):
 
     def phi_y(y):
         prox_b(y)
-        prox_scout(y)
+        #prox_scout(y)
         prox_sup_sin(y)
 
     def G_id(y):
@@ -203,7 +201,7 @@ def main(method):
     if "fbp.py" == method_id:
         #method(interior_A, interior_proj, initial_x)
         method(full_A, initial_y, initial_x)
-        print numpy.min(initial_x), numpy.max(initial_x)
+        print(numpy.min(initial_x), numpy.max(initial_x))
         utils.show_image(initial_x*xmask, HU_lim)
         logger(9, initial_x)
 
@@ -228,7 +226,7 @@ def main(method):
                iter_callback=viewer)
 
     if "sirt.py" == method_id:
-        alpha = 0.85
+        alpha = 0.1
         method(interior_A, interior_proj, alpha, niter,
                x=initial_x,
                iter_callback=viewer)
@@ -257,7 +255,7 @@ def main(method):
                ntv=ntv,
                niter=niter,
                x=initial_x,
-               iter_callback=logger)
+               iter_callback=viewer)
 
     if "app.py" == method_id:
         #alpha = 0.8 # slp
@@ -274,7 +272,7 @@ def main(method):
                y=initial_y,
                #y=None,
                mu=None,
-               iter_callback=logger)
+               iter_callback=viewer)
 
     if "cp.py" == method_id:
         #alpha = 0.05  # slp

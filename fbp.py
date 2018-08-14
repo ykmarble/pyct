@@ -1,9 +1,9 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import ctfilter
-from worker import main
+from pyct import ctfilter
+from pyct import utils
+from pyct.worker import main
 import numpy
-import utils
 
 def fbp(A, data, recon):
     ctfilter.shepp_logan_filter(data)

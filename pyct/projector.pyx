@@ -1,5 +1,4 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
 import ctfilter
 import skimage.filters
@@ -181,12 +180,12 @@ class Projector(object):
                 inv_cos_th = 1 / cos_th
                 inv_abs_cos = fabs(inv_cos_th)
 
-                for ri_i in xrange(NoD):
+                for ri_i in range(NoD):
                     ri = r_indexes[ri_i]
                     r = (ri - detectors_center) * dr
                     ray_offset = r * inv_cos_th
 
-                    for xi in xrange(NoI):
+                    for xi in range(NoI):
                         xs = xi - center_x
                         rayy = -(sin_cos * xs + ray_offset) + center_y
                         yi = int(floor(rayy))
@@ -208,12 +207,12 @@ class Projector(object):
                 inv_sin_th = 1 / sin_th
                 inv_abs_sin = fabs(inv_sin_th)
 
-                for ri_i in xrange(NoD):
+                for ri_i in range(NoD):
                     ri = r_indexes[ri_i]
                     r = (ri - detectors_center) * dr
                     ray_offset = r * inv_sin_th
 
-                    for yi in xrange(NoI):
+                    for yi in range(NoI):
                         ys = center_y - yi
                         rayx = cos_sin * ys - ray_offset + center_x
                         xi = int(floor(rayx))
@@ -265,8 +264,8 @@ class Projector(object):
             a = sin(th)
             b = -cos(th)
 
-            for xi in xrange(NoI):
-                for yi in xrange(NoI):
+            for xi in range(NoI):
+                for yi in range(NoI):
 
                     x = xi - center_x
                     y = center_y - yi  # 行列表記と軸の方向が逆になることに注意

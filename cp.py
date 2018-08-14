@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
-from worker import main
+from pyct import utils
+from pyct.worker import main
 import numpy
 
 
@@ -45,7 +45,7 @@ def cp(A, b, alpha, beta, ramda, niter,
 
     x_bar = x.copy()
 
-    for i in xrange(niter):
+    for i in range(niter):
 
         A.forward(x_bar, proj)
         proj -= b

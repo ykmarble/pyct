@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
-from worker import main
+from pyct import utils
+from pyct.worker import main
 import numpy
 
 
@@ -26,7 +26,7 @@ def iterative_fbp(A, b, alpha, niter, phi_x=lambda x: x,
     proj = utils.zero_proj(A)
     A.forward(x, proj)
 
-    for i in xrange(niter):
+    for i in range(niter):
         proj -= b
         G(proj)
         A.backward(proj, img)

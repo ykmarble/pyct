@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
+from pyct import utils
 from pylab import *
 import sys
 import os
@@ -28,7 +28,7 @@ def path_picker(path):
 
 def main():
     if len(sys.argv) != 2 and len(sys.argv) != 4:
-        print "Usage: {} <rawfile> [c-low, c-high]".format(sys.argv[0])
+        print("Usage: {} <rawfile> [c-low, c-high]".format(sys.argv[0]))
         return
 
     path = sys.argv[1]
@@ -43,8 +43,8 @@ def main():
 
     while True:
         img, path = img_gen(inc)
-        print path
-        print numpy.min(img), numpy.max(img)
+        print(path)
+        print(numpy.min(img), numpy.max(img))
         cv2.destroyAllWindows()
         key = utils.show_image(img, clim, caption=path)
         if key == "f":

@@ -1,10 +1,11 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
 import os
 import sys
 from operator import add
 import shutil
+from functools import reduce
+
 
 def main():
     LOGDIR = "iterout"
@@ -14,7 +15,7 @@ def main():
     if len(sys.argv) == 2 and sys.argv[1] == "1":
         dryrun = False
     else:
-        print "dryrun mode"
+        print("dryrun mode")
 
 
     dirs = [p for p in (os.path.join(LOGDIR, d) for d in os.listdir(LOGDIR)) if os.path.isdir(p)]
@@ -30,7 +31,7 @@ def main():
         # log dir
         elif "iterlog.txt" in content:
             with open(os.path.join(path, "iterlog.txt")) as f:
-                nlines = reduce(add, (1 for i in f.xreadlines()), 0)
+                nlines = reduce(add, (1 for i in f), 0)
                 if nlines < THRESOLD:
                     delete_flag = True
 
@@ -42,7 +43,7 @@ def main():
                     dirs.append(subpath)
 
         if delete_flag:
-            print "delete {}".format(path), content
+            print("delete {}".format(path), content)
             if not dryrun:
                 shutil.rmtree(path)
 

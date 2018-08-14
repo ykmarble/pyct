@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
-#-*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
-import utils
+from pyct import utils
 from pylab import *
+
 
 def main():
     import sys

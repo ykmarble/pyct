@@ -1,7 +1,6 @@
-#!/usr/bin/env python2
-#!-*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
-import utils
+from pyct import utils
 import numpy
 import skimage.transform
 from math import sin, cos, pi
@@ -37,8 +36,8 @@ def draw_elipse(canvas, level, pos, r, theta=0):
         v = level
         level = lambda x, y: v
 
-    for i in xrange(canvas.shape[0]):
-        for j in xrange(canvas.shape[1]):
+    for i in range(canvas.shape[0]):
+        for j in range(canvas.shape[1]):
             je, ie = elipse_chord(main_chord((j, i)))
             if (ry_2 * je**2 + rx_2 * ie**2 < rx_2 * ry_2):
                 canvas[i, j] += level(je, ie)

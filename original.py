@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-from worker import main
+from pyct.worker import main
 
 
 if __name__ == '__main__':

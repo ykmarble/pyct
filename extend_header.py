@@ -1,15 +1,15 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
 import struct
 import numpy
-import utils
+from ctpy import utils
 import sys
+
 
 def main():
     if (len(sys.argv) != 4):
-        print "Usage: {} <image-file> <width> <height>".format(sys.argv[0])
-        print "byte order: column -> row"
+        print("Usage: {} <image-file> <width> <height>".format(sys.argv[0]))
+        print("byte order: column -> row")
         return
     _, path, width, height = sys.argv
     width = int(width)

@@ -1,9 +1,8 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 
-from worker import main
-import utils
-import os_sart
+from pyct import utils
+from pyct import _os_sart as os_sart
+from pyct.worker import main
 import numpy
 
 
@@ -37,10 +36,10 @@ def os_sart_tv(A, b, os_alpha=0.9, tv_alpha=0.01, tv_alpha_s=0.9997,
     d = utils.empty_img(A)
     subsets = os_sart.make_subset(NoA, nsubset)
     a_ip, a_pj_subset = os_sart.calc_scale(A, subsets)
-    for i in xrange(niter):
-        for p_art in xrange(nsubset):
+    for i in range(niter):
+        for p_art in range(nsubset):
             os_sart.os_sart_mainloop(A, b, x, os_alpha, a_ip, a_pj_subset, subsets, p_art, img, proj)
-            for p_tv in xrange(ntv):
+            for p_tv in range(ntv):
                 tv_derivative(x, d)
                 beta = numpy.max(x) / numpy.max(d)
                 x -= tv_alpha * beta * d

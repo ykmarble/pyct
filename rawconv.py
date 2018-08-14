@@ -1,13 +1,13 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 from PIL import Image
 import numpy
-import utils
+from pyct import utils
 import sys
 
 def main():
     if (len(sys.argv) < 2):
-        print "Usage: {} image-file...".format(sys.argv[0])
+        print("Usage: {} image-file...".format(sys.argv[0]))
         return
     paths = sys.argv[1:]
     for p in paths:

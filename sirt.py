@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-from worker import main
-import utils
+from pyct.worker import main
+from pyct import utils
 
 
 def sirt(A, data, alpha, niter=500, x=None, iter_callback=lambda *x : None):
@@ -11,7 +11,7 @@ def sirt(A, data, alpha, niter=500, x=None, iter_callback=lambda *x : None):
     img = utils.empty_img(A)
     proj = utils.empty_proj(A)
 
-    for i in xrange(niter):
+    for i in range(niter):
         A.forward(x, proj)
         proj -= data
         A.backward(proj, img)

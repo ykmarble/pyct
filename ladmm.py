@@ -1,7 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-import utils
-from worker import main
+from pyct import utils
+from pyct.worker import main
 
 
 def ladmm(A, alpha, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y: y,
@@ -33,7 +33,7 @@ def ladmm(A, alpha, niter, phi_x=lambda x: x, phi_y=lambda y: y, G=lambda y: y,
     proj_k1 = utils.zero_proj(A)
     proj_k = utils.zero_proj(A)
 
-    for i in xrange(niter):
+    for i in range(niter):
         proj_k -= y
         proj_k += mu
         G(proj_k)
